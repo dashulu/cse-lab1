@@ -98,7 +98,27 @@ inode_manager::alloc_inode(uint32_t type)
    * note: the normal inode block should begin from the 2nd inode block.
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
-  return 1;
+  int i;
+  struct inode ino;
+  struct inode* tmp;
+  bzero(&ino, sizeof(struct inode));
+
+  // too slow. A better way is add a inode bitmap.
+  for(i = 1;i < INODE_NUM;i++) {
+    if( (tmp = get_inode(i)) == NULL) {
+      break;
+    } else {
+      free(tmp);
+    }
+  }
+  if(i < INODE_NUM) {
+    ino.size = 0;
+    ino.type = type;
+    put_inode(i, &ino);
+    return i;
+  } else {
+    return 0;
+  }
 }
 
 void
@@ -109,6 +129,15 @@ inode_manager::free_inode(uint32_t inum)
    * note: you need to check if the inode is already a freed one;
    * if not, clear it, and remember to write back to disk.
    */
+
+  struct inode *ino;
+  ino = get_inode(inum);
+
+  if(ino != NULL) {
+    bzero(ino, sizeof(struct inode));
+    put_inode(inum, ino);
+    free(ino);
+  }
 
   return;
 }
@@ -199,6 +228,19 @@ inode_manager::getattr(uint32_t inum, extent_protocol::attr &a)
    * you can refer to "struct attr" in extent_protocol.h
    */
   
+  struct inode* ino;
+
+  ino = get_inode(inum);
+  if(ino == NULL)
+    return;
+
+  a.type = ino->type;
+  a.atime = ino->atime;
+  a.ctime = ino->ctime;
+  a.mtime = ino->mtime;
+  a.size = ino->size;
+
+  free(ino);   
   return;
 }
 

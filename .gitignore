@@ -1,3 +1,4 @@
 *.o
 *.d
 lab1_tester
+.tags
