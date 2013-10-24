@@ -1,2 +1,4 @@
 Note:
-// lab uses disk class to emulate real disk repo.
+// the disk layout is like this:
+ | boot sector(one block)| superblock(one block) | block bitmap | inode table| data|
+

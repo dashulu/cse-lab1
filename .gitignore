@@ -2,3 +2,8 @@
 *.d
 lab1_tester
 .tags
+a.out
+Bitmap.cc
+Bitmap.h
+Bitmaptest.cc
+test_result
