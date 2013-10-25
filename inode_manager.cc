@@ -125,7 +125,7 @@ block_manager::block_manager()
 
   // for inodetable
   // the macro IBLOCK is so confusing 
-  for(int i = 0;i <= (INODE_NUM + IPB - 1)/IPB;i++) {
+  for(uint32_t i = 0;i <= (INODE_NUM + IPB - 1)/IPB;i++) {
     block_bitmap->mark( 2 + (BLOCK_NUM + BPB - 1) / BPB + i);
   }
 
@@ -345,8 +345,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
    */
   
   struct inode *ino;
-  int origin_block_num, cur_block_num;
-  int i;
+  uint32_t origin_block_num, cur_block_num;
+  uint32_t i;
 
   ino = get_inode(inum);
   if(ino == NULL)
@@ -446,7 +446,7 @@ inode_manager::remove_file(uint32_t inum)
    */
 
   struct inode *ino;
-  int block_num;
+  uint32_t block_num;
   
   ino = get_inode(inum);
   if(ino == NULL) 
@@ -454,14 +454,14 @@ inode_manager::remove_file(uint32_t inum)
 
   block_num = BLOCK_COUNT(ino->size);
 
-  for(int i = 0;i < NDIRECT && i < block_num;i++) {
+  for(uint32_t i = 0;i < NDIRECT && i < block_num;i++) {
     bm->free_block(ino->blocks[i]);
   }
 
   if(block_num > NDIRECT) {
     uint32_t indirect_block[NINDIRECT];
     bm->read_block(ino->blocks[NDIRECT], (char*) indirect_block);
-    for(int i = 0;i < block_num - NDIRECT && i < NINDIRECT;i++) {
+    for(uint32_t i = 0;i < block_num - NDIRECT && i < NINDIRECT;i++) {
       bm->free_block(indirect_block[i]);
     }
     bm->free_block(ino->blocks[NDIRECT]);
