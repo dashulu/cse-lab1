@@ -124,7 +124,8 @@ block_manager::block_manager()
   }
 
   // for inodetable
-  for(int i = 0;i < (INODE_NUM + IPB - 1)/IPB;i++) {
+  // the macro IBLOCK is so confusing 
+  for(int i = 0;i <= (INODE_NUM + IPB - 1)/IPB;i++) {
     block_bitmap->mark( 2 + (BLOCK_NUM + BPB - 1) / BPB + i);
   }
 
