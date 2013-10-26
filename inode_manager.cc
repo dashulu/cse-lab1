@@ -97,8 +97,8 @@ inode_manager::inode_manager()
 {
   bm = new block_manager();
   uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
-  if (root_dir != 1) {
-    printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
+  if (root_dir != 0) {
+    printf("\tim: error! alloc first inode %d, should be 0\n", root_dir);
     exit(0);
   }
 }
@@ -113,7 +113,23 @@ inode_manager::alloc_inode(uint32_t type)
    * note: the normal inode block should begin from the 2nd inode block.
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
-  return 1;
+  char buf[BLOCK_SIZE];
+  struct inode *next;
+  for (uint32_t i = 0; i < INODE_NUM; i += IPB) {
+    bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);   // fetch one block of inodes
+    for (uint32_t j = 0; j < IPB; j++) {
+      next = (struct inode *) buf + j;
+      // Forget about the block bitmap!
+      // Use type in inode to decide whether it is free
+      if (next->type == 0) {
+        next->type = type;
+        bm->write_block(IBLOCK(i, bm->sb.nblocks), buf);  // flush changes to disk
+        printf("\tim: alloc_inode: %d\n", i + j);
+        return i + j;
+      }
+    }
+  }
+  return INODE_NUM;   // impossible number, indicate an error
 }
 
 void
@@ -213,8 +229,17 @@ inode_manager::getattr(uint32_t inum, extent_protocol::attr &a)
    * note: get the attributes of inode inum.
    * you can refer to "struct attr" in extent_protocol.h
    */
-  
-  return;
+  struct inode *ino = get_inode(inum);
+  // TODO: how to convert reference (a) to pointer to make sure we cat use memcpy ?
+  // memcpy((void *)a, ino, sizeof(extent_protocol::attr));
+  if (ino != NULL) {
+    a.type = ino->type;
+    a.atime = ino->atime;
+    a.mtime = ino->mtime;
+    a.ctime = ino->ctime;
+    a.size = ino->size;
+    free(ino);
+  }
 }
 
 void
