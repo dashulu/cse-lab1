@@ -68,6 +68,11 @@ block_manager::free_block(uint32_t id)
    * note: you should unmark the corresponding bit in the block bitmap when free.
    */
 
+  blockid_t start = 2 + BLOCK_NUM / BPB + (INODE_NUM / IPB + 1);
+  if (id < start) {
+    printf("bm: try to free non-data blocks\n");
+    return;
+  }
   char buf[BLOCK_SIZE];
   read_block(BBLOCK(id), buf);
   size_t bi = id % BPB / 8; // byte index
@@ -403,6 +408,36 @@ inode_manager::remove_file(uint32_t inum)
    * your lab1 code goes here
    * note: you need to consider about both the data block and inode of the file
    */
-  
-  return;
+  struct inode *ino = get_inode(inum);
+  if (ino == NULL){
+    printf("\tim: inode not exist\n");
+    return;
+  }
+
+  if (0 < ino->size && ino->size <= NDIRECT * BLOCK_SIZE) {
+    for (int i = 0; i * BLOCK_SIZE < ino->size; i++) {
+      assert(ino->blocks[i]);
+      bm->free_block(ino->blocks[i]);
+    }
+  }
+
+  else if (ino->size != 0) {
+    for (int i = 0; i < NDIRECT; i++) {
+      assert(ino->blocks[i]);
+      bm->free_block(ino->blocks[i]);
+    }
+    char indbuf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT], indbuf);
+    uint *indblks = (uint *) indbuf;
+    int j = 0;
+    for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < ino->size; j++) {
+      assert(indblks[j]);
+      bm->free_block(indblks[j]);
+    }
+    bm->free_block(ino->blocks[NDIRECT]);
+  }
+
+  ino->type = 0;
+  put_inode(inum, ino);
+  free(ino);
 }
