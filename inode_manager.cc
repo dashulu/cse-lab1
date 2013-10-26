@@ -40,13 +40,15 @@ block_manager::alloc_block()
   char buf[BLOCK_SIZE];
   for (blockid_t i = start; i < BLOCK_NUM; i += BPB) {
     read_block(BBLOCK(i), buf);
-    // 从i到i + BPB - 1的block的bitmap都在这里啦，找第1个为0的位置，记为j，return i + j * 8 + inner_bit_offset;
-    // 决定一个byte一个byte的扫描
+    // byte scanning
     for (uint32_t j = 0; j < BLOCK_SIZE; j++) {
-      if (buf[j] != 0xFF) {
+      if ((uint8_t) buf[j] != 0xFF) {
+        uint8_t map = (uint8_t) buf[j];
         uint32_t offset = 0;
-        while (buf[j] & 0x1)
-          buf[j] >>= 1; offset++;
+        while (map & 0x1) {
+          map >>= 1;
+          offset++;
+        }
         buf[j] |= (0x1 << offset);
         write_block(BBLOCK(i), buf);
         return i + j * 8 + offset;
@@ -229,8 +231,56 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
    * note: read blocks related to inode number inum,
    * and copy them to buf_out
    */
-  
-  return;
+  struct inode *ino = get_inode(inum);
+  if (ino == NULL) {
+    printf("\tin: inode not exist\n");
+    *size = 0;
+    return;
+  }
+
+  *size = ino->size;
+  char *out = (char *) malloc(sizeof(char) * ino->size);
+  *buf_out = out;
+
+  if (*size == 0)
+    *size = 0;
+  else if (0 < *size && *size <= NDIRECT * BLOCK_SIZE) {
+
+    char buf[BLOCK_SIZE];
+    int i = 0;
+    for (; i < *size / BLOCK_SIZE; i++) {
+      bm->read_block(ino->blocks[i], buf);
+      memcpy(out, buf, BLOCK_SIZE);
+      out += BLOCK_SIZE;
+    }
+    if (*size % BLOCK_SIZE) {
+      bm->read_block(ino->blocks[i], buf);
+      memcpy(out, buf, *size % BLOCK_SIZE);
+    }
+
+  } else {
+
+    char buf[BLOCK_SIZE];
+    for (int i = 0; i < NDIRECT; i++) {
+      bm->read_block(ino->blocks[i], buf);
+      memcpy(out, buf, BLOCK_SIZE);
+      out += BLOCK_SIZE;
+    }
+    char indbuf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT], indbuf);
+    uint *indblks = (uint *) indbuf;
+    int j = 0;
+    for (; j < (*size - NDIRECT * BLOCK_SIZE) / BLOCK_SIZE; j++) {
+      bm->read_block(indblks[j], buf);
+      memcpy(out, buf, BLOCK_SIZE);
+      out += BLOCK_SIZE;
+    }
+    if ((*size - NDIRECT * BLOCK_SIZE) % BLOCK_SIZE) {
+      bm->read_block(indblks[j], buf);
+      memcpy(out, buf, (*size - NDIRECT * BLOCK_SIZE) % BLOCK_SIZE);
+    }
+
+  }
 }
 
 /* alloc/free blocks if needed */
