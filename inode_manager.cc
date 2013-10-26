@@ -247,61 +247,77 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
   if (ino == NULL) {
     printf("\tim: inode not exist\n");
     return;
-  } 
+  }
 
   // if size exceeds the limit, just drop the exceeding content
   size = MIN(size, MAXFILE * BLOCK_SIZE);
 
-  // copy content
-  int i = 0;
-  for (; i < NDIRECT && i * BLOCK_SIZE < size; i++) {
-    if (ino->blocks[i] == 0) {  // unallocated block
-      ino->blocks[i] = bm->alloc_block();
-      if (ino->blocks[i])
-        bm->write_block(ino->blocks[i], buf + i * BLOCK_SIZE);
-      else {
+  if (0 < size && size <= NDIRECT * BLOCK_SIZE) {
+    // copy blocks
+    int i = 0;
+    for (; i * BLOCK_SIZE < size; i++) {
+      // already copied i * BLOCK_SIZE
+      if (ino->blocks[i] == 0 && (ino->blocks[i] = bm->alloc_block()) == 0) {
         printf("\tim: fail to allocate new data block\n");
         free(ino);
         return;
       }
+      bm->write_block(ino->blocks[i], buf + i * BLOCK_SIZE);
+    }
+
+    // free blocks
+    for (; i < NDIRECT && ino->blocks[i]; i++) {
+      assert(size < ino->size);
+      bm->free_block(ino->blocks[i]);
+    }
+    if (ino->blocks[NDIRECT]) {
+      assert(i == NDIRECT);
+      char indbuf[BLOCK_SIZE];
+      bm->read_block(ino->blocks[NDIRECT], indbuf);
+      uint *indblks = (uint *) indbuf;
+      for (int j = 0; j < NINDIRECT && indblks[j]; j++)
+        bm->free_block(indblks[j]);
+      bm->free_block(ino->blocks[NDIRECT]);
     }
   }
 
-  if (i == NDIRECT) {
-    // start of indirect block
-    if (ino->blocks[NDIRECT] == 0) {  // unallocated block
-      ino->blocks[NDIRECT] = bm->alloc_block();
-      if (ino->blocks[NDIRECT] == 0) {
+  else {
+    // copy blocks
+    for (int i = 0; i < NDIRECT; i++) {
+      if (ino->blocks[i] == 0 && (ino->blocks[i] = bm->alloc_block()) == 0) {
         printf("\tim: fail to allocate new data block\n");
         free(ino);
         return;
       }
+      bm->write_block(ino->blocks[i], buf + i * BLOCK_SIZE);
+    }
+
+    if (ino->blocks[NDIRECT] == 0 && (ino->blocks[NDIRECT] = bm->alloc_block()) == 0) {
+      printf("\tim: fail to allocate new data block\n");
+      free(ino);
+      return;
     }
     char indbuf[BLOCK_SIZE];
     bm->read_block(ino->blocks[NDIRECT], indbuf);
     uint *indblks = (uint *) indbuf;
     int j = 0;
-    for (; i * BLOCK_SIZE < size; i++, j++) {
-      if (indblks[j] == 0) { // unallocated block
-        indblks[j] = bm->alloc_block();
-        if (indblks[j])
-          bm->write_block(ino->blocks[NDIRECT], indbuf);
-        else {
-          printf("\tim: fail to allocate new data block\n");
-          free(ino);
-          return;
-        }
+    for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < size; j++) {
+      if (indblks[j] == 0 && (indblks[j] = bm->alloc_block()) == 0) {
+        printf("\tim: fail to allocate new data block\n");
+        free(ino);
+        return;
       }
-      bm->write_block(indblks[j], buf + i * BLOCK_SIZE);
+      bm->write_block(indblks[j], buf + j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE);
     }
-    // end of indirect block
+    bm->write_block(ino->blocks[NDIRECT], indbuf);
+
+    // free blocks
+    for (; j < NINDIRECT && indblks[j]; j++) {
+      assert(size < ino->size);
+      bm->free_block(indblks[j]);
+    }
   }
 
-  // free extra blocks
-  // for (; i < NDIRECT && ino->blocks[i]; i++)
-  //   bm->free_block(ino->blocks[i]);
-  // for (; j < NINDIRECT && indblks[j]; j++)
-  //   bm->free_block(indblks[j]);
   // update meta data
   ino->mtime = time(0);
   ino->size = size;
