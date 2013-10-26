@@ -62,6 +62,21 @@ block_manager::block_manager()
   sb.nblocks = BLOCK_NUM;
   sb.ninodes = INODE_NUM;
 
+  printf("bootblock:\t 1\n");
+  printf("superblock:\t 1\n");
+  printf("BPB:\t %d\n", BPB);
+  printf("block bitmap:\t %d\n", BLOCK_NUM / BPB);
+  printf("IPB:\t %lu\n", IPB);
+  printf("inode table:\t %lu\n", INODE_NUM / IPB + 1);
+  printf("data block:\t ....\n");
+
+  write_block(0, (char *)&sb);
+  printf("inode 0 is at block %lu\n", IBLOCK(0, BLOCK_NUM));
+  printf("inode 2 is at block %lu\n", IBLOCK(2, BLOCK_NUM));
+  printf("inode 3 is at block %lu\n", IBLOCK(3, BLOCK_NUM));
+  printf("block %d containing bit for block 0\n", BBLOCK(0));
+  printf("block %d containing bit for block 4095\n", BBLOCK(4095));
+  printf("block %d containing bit for block 4096\n", BBLOCK(4096));
 }
 
 void
