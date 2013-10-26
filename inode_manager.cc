@@ -36,7 +36,25 @@ block_manager::alloc_block()
    * note: you should mark the corresponding bit in block bitmap when alloc.
    * you need to think about which block you can start to be allocated.
    */
+  blockid_t start = 2 + BLOCK_NUM / BPB + (INODE_NUM / IPB + 1);
+  char buf[BLOCK_SIZE];
+  for (blockid_t i = start; i < BLOCK_NUM; i += BPB) {
+    read_block(BBLOCK(i), buf);
+    // 从i到i + BPB - 1的block的bitmap都在这里啦，找第1个为0的位置，记为j，return i + j * 8 + inner_bit_offset;
+    // 决定一个byte一个byte的扫描
+    for (uint32_t j = 0; j < BLOCK_SIZE; j++) {
+      if (buf[j] != 0xFF) {
+        uint32_t offset = 0;
+        while (buf[j] & 0x1)
+          buf[j] >>= 1; offset++;
+        buf[j] |= (0x1 << offset);
+        write_block(BBLOCK(i), buf);
+        return i + j * 8 + offset;
+      }
+    }
+  }
 
+  printf("im: data block exhausted\n");
   return 0;
 }
 
@@ -47,8 +65,13 @@ block_manager::free_block(uint32_t id)
    * your lab1 code goes here.
    * note: you should unmark the corresponding bit in the block bitmap when free.
    */
-  
-  return;
+
+  char buf[BLOCK_SIZE];
+  read_block(BBLOCK(id), buf);
+  size_t bi = id % BPB / 8; // byte index
+  size_t bo = id % BPB % 8; // byte offset
+  buf[bi] &= (0xFF - (0x1 << bo));
+  write_block(BBLOCK(id), buf);
 }
 
 // The layout of disk should be like this:
@@ -116,20 +139,23 @@ inode_manager::alloc_inode(uint32_t type)
   char buf[BLOCK_SIZE];
   struct inode *next;
   for (uint32_t i = 0; i < INODE_NUM; i += IPB) {
-    bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);   // fetch one block of inodes
+    bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
     for (uint32_t j = 0; j < IPB; j++) {
       next = (struct inode *) buf + j;
       // Forget about the block bitmap!
       // Use type in inode to decide whether it is free
       if (next->type == 0) {
         next->type = type;
-        bm->write_block(IBLOCK(i, bm->sb.nblocks), buf);  // flush changes to disk
+        // flush changes to disk
+        bm->write_block(IBLOCK(i, bm->sb.nblocks), buf);
         printf("\tim: alloc_inode: %d\n", i + j);
         return i + j;
       }
     }
   }
-  return INODE_NUM;   // impossible number, indicate an error
+  printf("\tim: inode exhausted\n");
+  // return an impossible number to indicate an error
+  return INODE_NUM;
 }
 
 void
@@ -201,7 +227,7 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
   /*
    * your lab1 code goes here.
    * note: read blocks related to inode number inum,
-   * and copy them to buf_Out
+   * and copy them to buf_out
    */
   
   return;
@@ -217,8 +243,70 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
    * you need to consider the situation when the size of buf 
    * is larger or smaller than the size of original inode
    */
-  
-  return;
+  struct inode *ino = get_inode(inum);
+  if (ino == NULL) {
+    printf("\tim: inode not exist\n");
+    return;
+  } 
+
+  // if size exceeds the limit, just drop the exceeding content
+  size = MIN(size, MAXFILE * BLOCK_SIZE);
+
+  // copy content
+  int i = 0;
+  for (; i < NDIRECT && i * BLOCK_SIZE < size; i++) {
+    if (ino->blocks[i] == 0) {  // unallocated block
+      ino->blocks[i] = bm->alloc_block();
+      if (ino->blocks[i])
+        bm->write_block(ino->blocks[i], buf + i * BLOCK_SIZE);
+      else {
+        printf("\tim: fail to allocate new data block\n");
+        free(ino);
+        return;
+      }
+    }
+  }
+
+  if (i == NDIRECT) {
+    // start of indirect block
+    if (ino->blocks[NDIRECT] == 0) {  // unallocated block
+      ino->blocks[NDIRECT] = bm->alloc_block();
+      if (ino->blocks[NDIRECT] == 0) {
+        printf("\tim: fail to allocate new data block\n");
+        free(ino);
+        return;
+      }
+    }
+    char indbuf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT], indbuf);
+    uint *indblks = (uint *) indbuf;
+    int j = 0;
+    for (; i * BLOCK_SIZE < size; i++, j++) {
+      if (indblks[j] == 0) { // unallocated block
+        indblks[j] = bm->alloc_block();
+        if (indblks[j])
+          bm->write_block(ino->blocks[NDIRECT], indbuf);
+        else {
+          printf("\tim: fail to allocate new data block\n");
+          free(ino);
+          return;
+        }
+      }
+      bm->write_block(indblks[j], buf + i * BLOCK_SIZE);
+    }
+    // end of indirect block
+  }
+
+  // free extra blocks
+  // for (; i < NDIRECT && ino->blocks[i]; i++)
+  //   bm->free_block(ino->blocks[i]);
+  // for (; j < NINDIRECT && indblks[j]; j++)
+  //   bm->free_block(indblks[j]);
+  // update meta data
+  ino->mtime = time(0);
+  ino->size = size;
+  put_inode(inum, ino);
+  free(ino);
 }
 
 void

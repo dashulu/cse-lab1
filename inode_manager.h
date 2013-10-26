@@ -4,6 +4,7 @@
 #define inode_h
 
 #include <stdint.h>
+#include <time.h>
 #include "extent_protocol.h" // TODO: delete it
 
 #define DISK_SIZE  1024*1024*16
