@@ -173,8 +173,38 @@ inode_manager::free_inode(uint32_t inum)
    * note: you need to check if the inode is already a freed one;
    * if not, clear it, and remember to write back to disk.
    */
+  struct inode *ino = get_inode(inum);
+  if (ino == NULL){
+    printf("\tim: inode not exist\n");
+    return;
+  }
 
-  return;
+  if (0 < ino->size && ino->size <= NDIRECT * BLOCK_SIZE) {
+    for (int i = 0; i * BLOCK_SIZE < ino->size; i++) {
+      assert(ino->blocks[i]);
+      bm->free_block(ino->blocks[i]);
+    }
+  }
+
+  else if (ino->size != 0) {
+    for (int i = 0; i < NDIRECT; i++) {
+      assert(ino->blocks[i]);
+      bm->free_block(ino->blocks[i]);
+    }
+    char indbuf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT], indbuf);
+    uint *indblks = (uint *) indbuf;
+    int j = 0;
+    for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < ino->size; j++) {
+      assert(indblks[j]);
+      bm->free_block(indblks[j]);
+    }
+    bm->free_block(ino->blocks[NDIRECT]);
+  }
+
+  ino->type = 0;
+  put_inode(inum, ino);
+  free(ino);
 }
 
 
@@ -408,36 +438,5 @@ inode_manager::remove_file(uint32_t inum)
    * your lab1 code goes here
    * note: you need to consider about both the data block and inode of the file
    */
-  struct inode *ino = get_inode(inum);
-  if (ino == NULL){
-    printf("\tim: inode not exist\n");
-    return;
-  }
-
-  if (0 < ino->size && ino->size <= NDIRECT * BLOCK_SIZE) {
-    for (int i = 0; i * BLOCK_SIZE < ino->size; i++) {
-      assert(ino->blocks[i]);
-      bm->free_block(ino->blocks[i]);
-    }
-  }
-
-  else if (ino->size != 0) {
-    for (int i = 0; i < NDIRECT; i++) {
-      assert(ino->blocks[i]);
-      bm->free_block(ino->blocks[i]);
-    }
-    char indbuf[BLOCK_SIZE];
-    bm->read_block(ino->blocks[NDIRECT], indbuf);
-    uint *indblks = (uint *) indbuf;
-    int j = 0;
-    for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < ino->size; j++) {
-      assert(indblks[j]);
-      bm->free_block(indblks[j]);
-    }
-    bm->free_block(ino->blocks[NDIRECT]);
-  }
-
-  ino->type = 0;
-  put_inode(inum, ino);
-  free(ino);
+  free_inode(inum);
 }
