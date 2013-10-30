@@ -339,6 +339,9 @@ inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
   }
 
   // if size exceeds the limit, just drop the exceeding content
+  if (size > MAXFILE * BLOCK_SIZE)
+    printf("im: file size exceeds limit! (it will be truncated to meet the limit)\n");
+
   size = MIN(size, MAXFILE * BLOCK_SIZE);
 
   if (0 < size && size <= NDIRECT * BLOCK_SIZE) {
