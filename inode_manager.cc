@@ -75,8 +75,8 @@ block_manager::free_block(uint32_t id)
   }
   char buf[BLOCK_SIZE];
   read_block(BBLOCK(id), buf);
-  size_t bi = id % BPB / 8; // byte index
-  size_t bo = id % BPB % 8; // byte offset
+  uint32_t bi = id % BPB / 8; // byte index
+  uint32_t bo = id % BPB % 8; // byte offset
   buf[bi] &= (0xFF - (0x1 << bo));
   write_block(BBLOCK(id), buf);
 }
@@ -180,21 +180,21 @@ inode_manager::free_inode(uint32_t inum)
   }
 
   if (0 < ino->size && ino->size <= NDIRECT * BLOCK_SIZE) {
-    for (int i = 0; i * BLOCK_SIZE < ino->size; i++) {
+    for (uint32_t i = 0; i * BLOCK_SIZE < ino->size; i++) {
       assert(ino->blocks[i]);
       bm->free_block(ino->blocks[i]);
     }
   }
 
   else if (ino->size != 0) {
-    for (int i = 0; i < NDIRECT; i++) {
+    for (uint32_t i = 0; i < NDIRECT; i++) {
       assert(ino->blocks[i]);
       bm->free_block(ino->blocks[i]);
     }
     char indbuf[BLOCK_SIZE];
     bm->read_block(ino->blocks[NDIRECT], indbuf);
-    uint *indblks = (uint *) indbuf;
-    int j = 0;
+    uint32_t *indblks = (uint32_t *) indbuf;
+    uint32_t j = 0;
     for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < ino->size; j++) {
       assert(indblks[j]);
       bm->free_block(indblks[j]);
@@ -259,13 +259,15 @@ inode_manager::put_inode(uint32_t inum, struct inode *ino)
 /* Get all the data of a file by inum. 
  * Return alloced data, should be freed by caller. */
 void
-inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
+inode_manager::read_file(uint32_t inum, char **buf_out, int *ssize)
 {
   /*
    * your lab1 code goes here.
    * note: read blocks related to inode number inum,
    * and copy them to buf_out
    */
+  // dirty hack to depress type conversion warnings
+  uint32_t *size = (uint32_t *) ssize;
   struct inode *ino = get_inode(inum);
   if (ino == NULL) {
     printf("\tin: inode not exist\n");
@@ -282,7 +284,7 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
   else if (0 < *size && *size <= NDIRECT * BLOCK_SIZE) {
 
     char buf[BLOCK_SIZE];
-    int i = 0;
+    uint32_t i = 0;
     for (; i < *size / BLOCK_SIZE; i++) {
       bm->read_block(ino->blocks[i], buf);
       memcpy(out, buf, BLOCK_SIZE);
@@ -296,15 +298,15 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
   } else {
 
     char buf[BLOCK_SIZE];
-    for (int i = 0; i < NDIRECT; i++) {
+    for (uint32_t i = 0; i < NDIRECT; i++) {
       bm->read_block(ino->blocks[i], buf);
       memcpy(out, buf, BLOCK_SIZE);
       out += BLOCK_SIZE;
     }
     char indbuf[BLOCK_SIZE];
     bm->read_block(ino->blocks[NDIRECT], indbuf);
-    uint *indblks = (uint *) indbuf;
-    int j = 0;
+    uint32_t *indblks = (uint32_t *) indbuf;
+    uint32_t j = 0;
     for (; j < (*size - NDIRECT * BLOCK_SIZE) / BLOCK_SIZE; j++) {
       bm->read_block(indblks[j], buf);
       memcpy(out, buf, BLOCK_SIZE);
@@ -320,7 +322,7 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
 
 /* alloc/free blocks if needed */
 void
-inode_manager::write_file(uint32_t inum, const char *buf, int size)
+inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
 {
   /*
    * your lab1 code goes here.
@@ -328,6 +330,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
    * you need to consider the situation when the size of buf 
    * is larger or smaller than the size of original inode
    */
+  // dirty hack to depress type conversion warnings
+  uint32_t size = (uint32_t) ssize;
   struct inode *ino = get_inode(inum);
   if (ino == NULL) {
     printf("\tim: inode not exist\n");
@@ -339,7 +343,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
 
   if (0 < size && size <= NDIRECT * BLOCK_SIZE) {
     // copy blocks
-    int i = 0;
+    uint32_t i = 0;
     for (; i * BLOCK_SIZE < size; i++) {
       // already copied i * BLOCK_SIZE
       if (ino->blocks[i] == 0 && (ino->blocks[i] = bm->alloc_block()) == 0) {
@@ -359,8 +363,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
       assert(i == NDIRECT);
       char indbuf[BLOCK_SIZE];
       bm->read_block(ino->blocks[NDIRECT], indbuf);
-      uint *indblks = (uint *) indbuf;
-      for (int j = 0; j < NINDIRECT && indblks[j]; j++)
+      uint32_t *indblks = (uint32_t *) indbuf;
+      for (uint32_t j = 0; j < NINDIRECT && indblks[j]; j++)
         bm->free_block(indblks[j]);
       bm->free_block(ino->blocks[NDIRECT]);
     }
@@ -368,7 +372,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
 
   else {
     // copy blocks
-    for (int i = 0; i < NDIRECT; i++) {
+    for (uint32_t i = 0; i < NDIRECT; i++) {
       if (ino->blocks[i] == 0 && (ino->blocks[i] = bm->alloc_block()) == 0) {
         printf("\tim: fail to allocate new data block\n");
         free(ino);
@@ -384,8 +388,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     }
     char indbuf[BLOCK_SIZE];
     bm->read_block(ino->blocks[NDIRECT], indbuf);
-    uint *indblks = (uint *) indbuf;
-    int j = 0;
+    uint32_t *indblks = (uint32_t *) indbuf;
+    uint32_t j = 0;
     for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < size; j++) {
       if (indblks[j] == 0 && (indblks[j] = bm->alloc_block()) == 0) {
         printf("\tim: fail to allocate new data block\n");
