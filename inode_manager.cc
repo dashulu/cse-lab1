@@ -36,7 +36,7 @@ block_manager::alloc_block()
    * note: you should mark the corresponding bit in block bitmap when alloc.
    * you need to think about which block you can start to be allocated.
    */
-  blockid_t start = 2 + BLOCK_NUM / BPB + (INODE_NUM / IPB + 1);
+  blockid_t start = IBLOCK(INODE_NUM, BLOCK_NUM) + 1;
   char buf[BLOCK_SIZE];
   for (blockid_t i = start; i < BLOCK_NUM; i += BPB) {
     read_block(BBLOCK(i), buf);
@@ -67,8 +67,7 @@ block_manager::free_block(uint32_t id)
    * your lab1 code goes here.
    * note: you should unmark the corresponding bit in the block bitmap when free.
    */
-
-  blockid_t start = 2 + BLOCK_NUM / BPB + (INODE_NUM / IPB + 1);
+  blockid_t start = IBLOCK(INODE_NUM, BLOCK_NUM) + 1;
   if (id < start) {
     printf("bm: try to free non-data blocks\n");
     return;
@@ -101,12 +100,14 @@ block_manager::block_manager()
   printf("data block:\t ....\n");
 
   write_block(0, (char *)&sb);
-  printf("inode 0 is at block %lu\n", IBLOCK(0, BLOCK_NUM));
+  printf("inode 1 is at block %lu\n", IBLOCK(1, BLOCK_NUM));
   printf("inode 2 is at block %lu\n", IBLOCK(2, BLOCK_NUM));
   printf("inode 3 is at block %lu\n", IBLOCK(3, BLOCK_NUM));
-  printf("block %d containing bit for block 0\n", BBLOCK(0));
-  printf("block %d containing bit for block 4095\n", BBLOCK(4095));
-  printf("block %d containing bit for block 4096\n", BBLOCK(4096));
+  printf("inode %d is at block %lu\n", INODE_NUM, IBLOCK(INODE_NUM, BLOCK_NUM));
+  printf("block 0 bit: %d\n", BBLOCK(0));
+  printf("block 4095 bit: %d\n", BBLOCK(4095));
+  printf("block 4096 bit: %d\n", BBLOCK(4096));
+  printf("block %d bit: %d\n", BLOCK_NUM - 1, BBLOCK(BLOCK_NUM - 1));
 }
 
 void
@@ -127,8 +128,8 @@ inode_manager::inode_manager()
 {
   bm = new block_manager();
   uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
-  if (root_dir != 0) {
-    printf("\tim: error! alloc first inode %d, should be 0\n", root_dir);
+  if (root_dir != 1) {
+    printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
     exit(0);
   }
 }
@@ -145,7 +146,7 @@ inode_manager::alloc_inode(uint32_t type)
    */
   char buf[BLOCK_SIZE];
   struct inode *next;
-  for (uint32_t i = 0; i < INODE_NUM; i += IPB) {
+  for (uint32_t i = 1; i <= INODE_NUM; i += IPB) {
     bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
     for (uint32_t j = 0; j < IPB; j++) {
       next = (struct inode *) buf + j;
@@ -162,7 +163,7 @@ inode_manager::alloc_inode(uint32_t type)
   }
   printf("\tim: inode exhausted\n");
   // return an impossible number to indicate an error
-  return INODE_NUM;
+  return INODE_NUM + 1;
 }
 
 void
@@ -218,15 +219,14 @@ inode_manager::get_inode(uint32_t inum)
 
   printf("\tim: get_inode %d\n", inum);
 
-  if (inum < 0 || inum >= INODE_NUM) {
+  if (inum <= 0 || inum > INODE_NUM) {
     printf("\tim: inum out of range\n");
     return NULL;
   }
 
   bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
-  // printf("%s:%d\n", __FILE__, __LINE__);
 
-  ino_disk = (struct inode*)buf + inum%IPB;
+  ino_disk = (struct inode*)buf + (inum - 1) % IPB;
   if (ino_disk->type == 0) {
     printf("\tim: inode not exist\n");
     return NULL;
@@ -249,7 +249,7 @@ inode_manager::put_inode(uint32_t inum, struct inode *ino)
     return;
 
   bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
-  ino_disk = (struct inode*)buf + inum%IPB;
+  ino_disk = (struct inode*)buf + (inum - 1) % IPB;
   *ino_disk = *ino;
   bm->write_block(IBLOCK(inum, bm->sb.nblocks), buf);
 }
