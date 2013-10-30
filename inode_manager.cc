@@ -146,7 +146,7 @@ inode_manager::alloc_inode(uint32_t type)
    */
   char buf[BLOCK_SIZE];
   struct inode *next;
-  for (uint32_t i = 1; i <= INODE_NUM; i += IPB) {
+  for (uint32_t i = 1; i <= INODE_NUM - IPB + 1; i += IPB) {
     bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
     for (uint32_t j = 0; j < IPB; j++) {
       next = (struct inode *) buf + j;
