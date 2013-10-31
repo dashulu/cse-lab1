@@ -38,7 +38,21 @@ block_manager::alloc_block()
    */
   blockid_t start = IBLOCK(INODE_NUM, BLOCK_NUM) + 1;
   char buf[BLOCK_SIZE];
-  for (blockid_t i = start; i < BLOCK_NUM; i += BPB) {
+
+  // the start block's bit position may not be BPB-alignment, so we need to handle it differently
+  read_block(BBLOCK(start), buf);
+  for (uint32_t j = start; j < start / BPB + BPB; j++) {
+    uint32_t b_num = j / 8;
+    uint8_t b_offset = j % 8;
+    bool flag = (buf[b_num] << b_offset) & 0x80;
+    if (!flag) {
+      buf[b_num] |= (0x1 << (7 - b_offset));
+      write_block(BBLOCK(start), buf);
+      return j;
+    }
+  }
+
+  for (blockid_t i = start / BPB + BPB; i < BLOCK_NUM; i += BPB) {
     read_block(BBLOCK(i), buf);
     // byte scanning
     for (uint32_t j = 0; j < BLOCK_SIZE; j++) {
