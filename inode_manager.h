@@ -4,6 +4,7 @@
 #define inode_h
 
 #include <stdint.h>
+#include <time.h>
 #include "extent_protocol.h" // TODO: delete it
 
 #define DISK_SIZE  1024*1024*16
@@ -54,7 +55,7 @@ class block_manager {
 #define IPB           (BLOCK_SIZE / sizeof(struct inode))
 
 // Block containing inode i
-#define IBLOCK(i, nblocks)     ((nblocks)/BPB + (i)/IPB + 3)
+#define IBLOCK(i, nblocks)     ((nblocks)/BPB + ((i) - 1)/IPB + 3)
 
 // Bitmap bits per block
 #define BPB           (BLOCK_SIZE*8)
