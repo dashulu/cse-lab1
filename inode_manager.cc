@@ -205,6 +205,10 @@ inode_manager::free_inode(uint32_t inum)
    */
 
   struct inode *ino;
+
+  if(inum < 2)
+    return;
+  
   ino = get_inode(inum);
 
   if(ino != NULL) {

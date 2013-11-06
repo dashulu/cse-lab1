@@ -48,6 +48,7 @@ getattr(yfs_client::inum inum, struct stat &st)
     printf("getattr %016llx %d\n", inum, yfs->isfile(inum));
     if(yfs->isfile(inum)){
         yfs_client::fileinfo info;
+        
         ret = yfs->getfile(inum, info);
         if(ret != yfs_client::OK)
             return ret;
@@ -216,6 +217,16 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
     e->entry_timeout = 0.0;
     e->generation = 0;
 
+    yfs_client::inum p = parent; // req->in.h.nodeid;
+    yfs_client::inum file_ino;
+    yfs->create(p, name, mode, file_ino);
+    printf("monroe\n");
+    if(file_ino == 0)
+        return yfs_client::EXIST;
+
+    e->ino = file_ino;
+    getattr(file_ino, e->attr);
+
     /*
      * your lab2 code goes here.
      * note: you should use yfs->create to create file or directory;
@@ -277,6 +288,17 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
      * note: you should use yfs->lookup;
      * remember to return e using fuse_reply_entry.
      */
+
+    yfs_client::inum inu = parent; 
+    bool found = false;
+    yfs_client::inum ino;
+    yfs->lookup(inu, name, found, ino);
+    printf("lookup\n");
+    if(found) {
+        printf("found:%s\n", name);
+        getattr(ino, e.attr);
+        e.ino = ino;
+    }
     fuse_reply_entry(req, &e);
 }
 
@@ -334,6 +356,11 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
     memset(&b, 0, sizeof(b));
 
     std::list<yfs_client::dirent> list;
+    yfs->readdir(inum, list);
+    printf("list size:%d\n",list.size());
+    for(std::list<yfs_client::dirent>::iterator iter = list.begin();iter != list.end();iter++) {
+        dirbuf_add(&b, iter->name.c_str(), iter->inum);
+    }
 
     /*
      * your lab2 code goes here.
