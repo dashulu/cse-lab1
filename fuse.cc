@@ -124,6 +124,8 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 {
     printf("fuseserver_setattr 0x%x\n", to_set);
     if (FUSE_SET_ATTR_SIZE & to_set) {
+        printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
+        struct stat st;
 
         /*
          * your lab2 code goes here.
@@ -131,6 +133,13 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
          * create a struct stat, fill it in using getattr, 
          * and reply back using fuse_reply_attr.
          */
+#if 0
+        // Change the above line to "#if 1", and your code goes here
+        // Note: fill st using getattr before fuse_reply_attr
+        fuse_reply_attr(req, &st, 0);
+#else
+    fuse_reply_err(req, ENOSYS);
+#endif
 
     } else {
         fuse_reply_err(req, ENOSYS);
@@ -158,6 +167,14 @@ fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
      * note: you should use yfs->read to read the buffer of size;
      * and reply using fuse_reply_buf. 
      */
+#if 0
+    std::string buf;
+    // Change the above "#if 0" to "#if 1", and your code goes here
+    fuse_reply_buf(req, buf.data(), buf.size());
+#else
+    fuse_reply_err(req, ENOSYS);
+#endif
+
 
 }
 
@@ -187,7 +204,12 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
      * from off to ino;
      * and reply the length of bytes_written using fuse_reply_write.
      */
-
+#if 0
+    // Change the above line to "#if 1", and your code goes here
+    fuse_reply_write(req, size);
+#else
+    fuse_reply_err(req, ENOSYS);
+#endif
 }
 
 //
@@ -233,7 +255,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
      * you alse need to fill the parameter e in.
      */
 
-    return yfs_client::OK;
+    return yfs_client::NOENT;
 }
 
 void
@@ -282,15 +304,16 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
     e.attr_timeout = 0.0;
     e.entry_timeout = 0.0;
     e.generation = 0;
+    bool found = false;
 
     /*
      * your lab2 code goes here.
      * note: you should use yfs->lookup;
      * remember to return e using fuse_reply_entry.
      */
+//<<<<<<< HEAD
 
     yfs_client::inum inu = parent; 
-    bool found = false;
     yfs_client::inum ino;
     yfs->lookup(inu, name, found, ino);
     printf("lookup\n");
@@ -299,7 +322,14 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
         getattr(ino, e.attr);
         e.ino = ino;
     }
-    fuse_reply_entry(req, &e);
+//    fuse_reply_entry(req, &e);
+//=======
+    if (found)
+        fuse_reply_entry(req, &e);
+    else
+        fuse_reply_err(req, ENOENT);
+
+//>>>>>>> 420784e91146e3002f3e0d493efc1a87a3ea4dca
 }
 
 
@@ -362,6 +392,7 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
         dirbuf_add(&b, iter->name.c_str(), iter->inum);
     }
 
+
     /*
      * your lab2 code goes here.
      * note: you should use yfs->readdir to create file or directory;
@@ -370,6 +401,8 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
      * and add it to the b data structure using dirbuf_add. 
      */
 
+    reply_buf_limited(req, b.p, b.size, off, size);
+    free(b.p);
 }
 
 
@@ -407,6 +440,12 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
      * note: you can use fuseserver_createhelper;
      * remember to return e using fuse_reply_entry.
      */
+#if 0
+    // Change the above line to "#if 1", and your code goes here
+    fuse_reply_entry(req, &e);
+#else
+    fuse_reply_err(req, ENOSYS);
+#endif
 
 }
 
@@ -426,6 +465,7 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
      * success:	fuse_reply_err(req, 0);
      * not found: fuse_reply_err(req, ENOENT);
      */
+    fuse_reply_err(req, ENOSYS);
 
 }
 
