@@ -129,7 +129,7 @@ yfs_client::setattr(inum ino, size_t size)
 }
 
 int
-yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
+yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bool _isdir)
 {
     int r = OK;
 
@@ -138,7 +138,38 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
      * note: lookup is what you need to check if file exist;
      * after create file or dir, you must remember to modify the parent infomation.
      */
+    bool found;
+    if ((r = lookup(parent, name, found, ino_out)) != OK)
+        return r;
+    if (found)
+        return EXIST;
 
+    // create new inode entry
+    if (_isdir) {
+        ec->create(extent_protocol::T_DIR, ino_out);
+        assert(isdir(ino_out));
+    }
+    else {
+        ec->create(extent_protocol::T_FILE, ino_out);
+        assert(isfile(ino_out));
+    }
+
+    // add <name, inum> to parent
+    std::string buf;
+    std::stringstream sst;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    sst << name << " " << ino_out << "\n";
+    buf.append(sst.str());
+    // buf += name + " " + ino_out + "\n";
+    if (ec->put(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+release:
     return r;
 }
 
@@ -152,6 +183,23 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
      * note: lookup file from parent dir according to name;
      * you should design the format of directory content.
      */
+    std::string buf;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
+
+    std::istringstream ist(buf);
+    std::string target(name), e_name;
+    inum e_ino;
+    found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ino_out = e_ino;
+            break;
+        }
+    }
 
     return r;
 }
@@ -166,7 +214,19 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
      * note: you should parse the dirctory content using your defined format,
      * and push the dirents to the list.
      */
+    std::string buf;
+    if (ec->get(dir, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
 
+    std::istringstream ist(buf);
+    std::string e_name;
+    inum e_ino;
+    while (ist >> e_name && ist >> e_ino) {
+        struct dirent d = {e_name, e_ino};
+        list.push_back(d);
+    }
     return r;
 }
 
