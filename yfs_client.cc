@@ -132,7 +132,6 @@ int
 yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
 {
     int r = OK;
-    printf("hello world\n");
 
     /*
      * your lab2 code goes here.
@@ -142,6 +141,8 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
 
     bool found = false;
     std::list<dirent> list;
+    std::list<dirent> list_readdir;
+    yfs_client::inum ino;
     yfs_client::dirent dentry;
     if(( r = lookup(parent, name, found, ino_out)) != OK) {
         ino_out = 0;
@@ -156,8 +157,25 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
         readdir(parent, list);
         dentry.name.assign(name);
         ec->create(extent_protocol::T_FILE, dentry.inum);
+        ino_out = dentry.inum;
         list.push_back(dentry);
+        printf("dentry name:%s  inum:%d\n", dentry.name.c_str(), dentry.inum);
+        std::string content = dentry_list_to_string(list);
+        printf("content of dentry:%s\n", content.c_str());
         ec->put(parent, dentry_list_to_string(list));
+        ec->get(parent, content);
+        printf("get content of data:%s\n", content.c_str());
+        bool found = false;
+        lookup(parent, dentry.name.c_str(), found, ino);
+        if(found) {
+            printf("found file %s in parent %d\n", dentry.name.c_str(), parent);
+        }
+        readdir(parent, list_readdir);
+        if(list_readdir.size() > 0) {
+            printf("list_readdir size:%d\n", list_readdir.size());
+        } else {
+            printf("readdir has some error.\n");
+        }
     } else {
         return r;
     }
@@ -273,6 +291,8 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
     yfs_client::dirent dentry;
     int begin = 0;
     ec->get((extent_protocol::extentid_t)dir, dir_content);
+
+    printf("dir_content in readdir:%s\n", dir_content.c_str());
 
     while((begin = get_dentry(dir_content, begin, dentry)) >= 0 ) {
         list.push_back(dentry);
