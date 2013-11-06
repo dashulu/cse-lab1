@@ -160,7 +160,10 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
         ino_out = dentry.inum;
         list.push_back(dentry);
         printf("dentry name:%s  inum:%d\n", dentry.name.c_str(), dentry.inum);
-        std::string content = dentry_list_to_string(list);
+        std::string content;
+        ec->get(parent, content);
+        printf("get content of data:%s\n", content.c_str());
+        content = dentry_list_to_string(list);
         printf("content of dentry:%s\n", content.c_str());
         ec->put(parent, dentry_list_to_string(list));
         ec->get(parent, content);
@@ -202,6 +205,7 @@ std::string
 yfs_client::dentry_list_to_string(std::list<dirent> list) {
     std::string content;
     for(std::list<dirent>::iterator iter = list.begin();iter != list.end();iter++) {
+        printf("iter value:%s\n", iter->name.c_str());
         content.append((*iter).name + " ");
         content.append(i_to_str((*iter).inum) + " ");
     } 
@@ -216,6 +220,7 @@ yfs_client::dentry_list_to_string(std::list<dirent> list) {
 int 
 yfs_client::get_dentry(std::string dir_content, int begin, yfs_client::dirent &dentry) {
     dentry.inum = 0;
+    dentry.name.clear();
     //get file name
     while(begin < dir_content.size() && dir_content[begin] != ' ') {
         dentry.name.push_back(dir_content[begin]);

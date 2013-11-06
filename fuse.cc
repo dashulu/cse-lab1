@@ -248,6 +248,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
 
     e->ino = file_ino;
     getattr(file_ino, e->attr);
+    return yfs_client::OK;
 
     /*
      * your lab2 code goes here.
@@ -255,7 +256,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
      * you alse need to fill the parameter e in.
      */
 
-    return yfs_client::NOENT;
+   // return yfs_client::NOENT;
 }
 
 void
@@ -387,7 +388,8 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
     std::list<yfs_client::dirent> list;
     yfs->readdir(inum, list);
-    printf("list size:%d\n",list.size());
+    if(list.size() > 0)
+        printf("list size:%d\n",list.size());
     for(std::list<yfs_client::dirent>::iterator iter = list.begin();iter != list.end();iter++) {
         dirbuf_add(&b, iter->name.c_str(), iter->inum);
     }
