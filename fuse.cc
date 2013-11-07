@@ -436,25 +436,17 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
         mode_t mode)
 {
     struct fuse_entry_param e;
-    // In yfs, timeouts are always set to 0.0, and generations are always set to 0
-    e.attr_timeout = 0.0;
-    e.entry_timeout = 0.0;
-    e.generation = 0;
-    // Suppress compiler warning of unused e.
-    (void) e;
-
-    /*
-     * your lab2 code goes here.
-     * note: you can use fuseserver_createhelper;
-     * remember to return e using fuse_reply_entry.
-     */
-#if 0
-    // Change the above line to "#if 1", and your code goes here
-    fuse_reply_entry(req, &e);
-#else
-    fuse_reply_err(req, ENOSYS);
-#endif
-
+    yfs_client::status ret;
+    if( (ret = fuseserver_createhelper( parent, name, mode, &e, true )) == yfs_client::OK ) {
+        fuse_reply_entry(req, &e);
+        printf("OK: mkdir returns.\n");
+    } else {
+        if (ret == yfs_client::EXIST) {
+            fuse_reply_err(req, EEXIST);
+        }else{
+            fuse_reply_err(req, ENOENT);
+        }
+    }
 }
 
 //
@@ -473,8 +465,17 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
      * success:	fuse_reply_err(req, 0);
      * not found: fuse_reply_err(req, ENOENT);
      */
-    fuse_reply_err(req, ENOSYS);
-
+    yfs_client::status ret;
+    if ((ret = yfs->unlink(parent, name)) == yfs_client::OK) {
+        fuse_reply_err(req, 0);
+        printf("OK: unlink returns.\n");
+    } else {
+        if (ret == yfs_client::EXIST) {
+            fuse_reply_err(req, ENOENT);
+        } else {
+            fuse_reply_err(req, ENOSYS);
+        }
+    }
 }
 
 void

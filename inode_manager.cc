@@ -222,7 +222,9 @@ inode_manager::free_inode(uint32_t inum)
   }
 
   ino->type = 0;
+  ino->size = 0;
   put_inode(inum, ino);
+  printf("\tim: free_inode: %d\n", inum);
   free(ino);
 }
 
@@ -435,6 +437,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
 
   // update meta data
   ino->mtime = time(0);
+  ino->ctime = time(0);
   ino->size = size;
   put_inode(inum, ino);
   free(ino);

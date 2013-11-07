@@ -353,6 +353,31 @@ int yfs_client::unlink(inum parent,const char *name)
      * and update the parent directory content.
      */
 
-    return r;
-}
+    std::string buf, new_buf;
 
+    if (ec->get(parent, buf) != extent_protocol::OK)
+        return IOERR;
+
+    std::istringstream ist(buf), new_ist;
+    std::string target(name), e_name;
+    inum e_ino;
+    bool found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ec->remove(e_ino);
+        } else {
+            std::stringstream sst;
+            sst << e_name << " " << e_ino << "\n";
+            new_buf.append(sst.str());
+        }
+    }
+
+    if (found) {
+        if (ec->put(parent, new_buf) != extent_protocol::OK)
+            return IOERR;
+        else
+            return OK;
+    } else
+        return EXIST;
+}
