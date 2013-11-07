@@ -125,6 +125,27 @@ yfs_client::setattr(inum ino, size_t size)
      * according to the size (<, =, or >) content length.
      */
 
+    printf("yfs_client setattr ino:%d size:%d\n", ino, size);
+    std::string file;
+    if((r = ec->get(ino, file)) != yfs_client::OK) {
+        return r;
+    }
+
+    printf("file.size in setattr:%d \n", file.size());
+    if(file.size() > size) {
+        file.resize(size);
+        printf("file.size in setattr:%d \n", file.size());
+    } else {
+        for(int i = file.size();i < size;i++) {
+            file.push_back('\0');
+        }
+    }
+
+    r = ec->put(ino, file);
+    struct stat st;
+    extent_protocol::attr a;
+    ec->getattr(ino, a);
+    printf("after yfs_client setattr ino:%d size:%d\n", ino, a.size);
     return r;
 }
 
@@ -310,11 +331,29 @@ int
 yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
 {
     int r = OK;
+    std::string file;
 
     /*
      * your lab2 code goes here.
      * note: read using ec->get().
      */
+
+    fileinfo fin;
+    getfile(ino, fin); 
+    if( (r = ec->get(ino, file)) != yfs_client::OK)
+        return r;
+
+    printf("fin.size :%d\n", fin.size);
+    if(fin.size <= off )
+        return r;
+    else {
+      //  data.assign(file.substr(off, size));
+        data.clear();
+        size = size + off < fin.size ? size : fin.size - off;
+        for(int i = 0;i < size;i++) {
+            data.push_back(file[off+i]);
+        }
+    }
 
     return r;
 }
@@ -331,6 +370,39 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      * when off > length of original file, fill the holes with '\0'.
      */
 
+    std::string file;
+    if((r = ec->get(ino, file)) != yfs_client::OK) {
+        return r;
+    }
+    bytes_written = size;
+ //   bytes_written = size <= strlen(data) ? size : strlen(data);
+    fileinfo fin;
+    getfile(ino, fin); 
+
+    printf("fin.size:%d off:%d size:%d\n", fin.size, off,size);
+    if(fin.size >= off + size) {
+        for(int i = off;i < off + size;i++) {
+            file[i] = data[i - off];
+        }
+    } else if(fin.size < off + size && fin.size >= off) {
+        for(int i = off;i < fin.size;i++) {
+            file[i] = data[i - off];
+        }
+        for(int i = fin.size;i < off + size;i++) {
+            file.push_back(data[i - off]);
+        }
+    } else {
+        for(int i = fin.size;i < off;i++) {
+            file.push_back('\0');
+        }
+        for(int i = off;i < off + size;i++) {
+            file.push_back(data[i - off]);
+        }
+    }
+    if((r = ec->put(ino, file)) != yfs_client::OK) {
+        bytes_written = 0;
+        return r;
+    }
     return r;
 }
 

@@ -68,6 +68,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <time.h>
+#include <unistd.h>
 #include <netdb.h>
 
 #include "jsl_log.h"

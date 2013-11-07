@@ -126,6 +126,7 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
     if (FUSE_SET_ATTR_SIZE & to_set) {
         printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
         struct stat st;
+        int r;
 
         /*
          * your lab2 code goes here.
@@ -133,9 +134,15 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
          * create a struct stat, fill it in using getattr, 
          * and reply back using fuse_reply_attr.
          */
-#if 0
+#if 1
         // Change the above line to "#if 1", and your code goes here
         // Note: fill st using getattr before fuse_reply_attr
+
+        if((r = yfs->setattr(ino, attr->st_size)) != yfs_client::OK) {
+            fuse_reply_err(req, r);
+            return;
+        } 
+        getattr(ino, st); 
         fuse_reply_attr(req, &st, 0);
 #else
     fuse_reply_err(req, ENOSYS);
@@ -167,9 +174,22 @@ fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
      * note: you should use yfs->read to read the buffer of size;
      * and reply using fuse_reply_buf. 
      */
-#if 0
+#if 1
     std::string buf;
+    yfs_client::inum inum = ino;
+    struct stat st;
+    yfs_client::status r;
+    printf("fuseserver_read: ino:%d size:%d off:%d\n", ino, size, off);
     // Change the above "#if 0" to "#if 1", and your code goes here
+    if(( r = getattr(inum, st)) != yfs_client::OK) {
+        fuse_reply_err(req, r);
+    }
+    if(st.st_size > off) {
+        if( (r = yfs->read(inum, size, off, buf)) != yfs_client::OK) {
+            fuse_reply_err(req, r);
+        }
+    }
+    printf("fuseserver_read reply:size:%d content:%s ", st.st_size, buf.data());
     fuse_reply_buf(req, buf.data(), buf.size());
 #else
     fuse_reply_err(req, ENOSYS);
@@ -204,9 +224,20 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
      * from off to ino;
      * and reply the length of bytes_written using fuse_reply_write.
      */
-#if 0
+#if 1
+
+    yfs_client::inum inum = ino;
+    size_t bytes_written;
+    int r;
+    printf("fuseserver_write: ino:%d size:%d off:%d content:\n", ino, size, off, buf);
+    if((r = yfs->write(inum, size, off, buf, bytes_written)) != yfs_client::OK) {
+        fuse_reply_err(req, r);
+    }
+    struct stat st;
+    getattr(ino, st);
     // Change the above line to "#if 1", and your code goes here
-    fuse_reply_write(req, size);
+    printf("fuseserver_write: ino:%d size:%d off:%d st_size:%d bytes_written:%d\n", ino, size, off,st.st_size,bytes_written);
+    fuse_reply_write(req, bytes_written);
 #else
     fuse_reply_err(req, ENOSYS);
 #endif
