@@ -263,7 +263,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
 //
 yfs_client::status
 fuseserver_createhelper(fuse_ino_t parent, const char *name,
-        mode_t mode, struct fuse_entry_param *e)
+        mode_t mode, struct fuse_entry_param *e, extent_protocol::types type)
 {
     // In yfs, timeouts are always set to 0.0, and generations are always set to 0
     e->attr_timeout = 0.0;
@@ -272,7 +272,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
 
     yfs_client::inum p = parent; // req->in.h.nodeid;
     yfs_client::inum file_ino;
-    yfs->create(p, name, mode, file_ino);
+    yfs->create(p, name, mode, file_ino, type);
     printf("monroe\n");
     if(file_ino == 0)
         return yfs_client::EXIST;
@@ -296,7 +296,7 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 {
     struct fuse_entry_param e;
     yfs_client::status ret;
-    if( (ret = fuseserver_createhelper( parent, name, mode, &e )) == yfs_client::OK ) {
+    if( (ret = fuseserver_createhelper( parent, name, mode, &e , extent_protocol::T_FILE)) == yfs_client::OK ) {
         fuse_reply_create(req, &e, fi);
         printf("OK: create returns.\n");
     } else {
@@ -312,7 +312,7 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
         const char *name, mode_t mode, dev_t rdev ) {
     struct fuse_entry_param e;
     yfs_client::status ret;
-    if( (ret = fuseserver_createhelper( parent, name, mode, &e )) == yfs_client::OK ) {
+    if( (ret = fuseserver_createhelper( parent, name, mode, &e ,extent_protocol::T_FILE)) == yfs_client::OK ) {
         fuse_reply_entry(req, &e);
     } else {
         if (ret == yfs_client::EXIST) {
@@ -473,9 +473,20 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
      * note: you can use fuseserver_createhelper;
      * remember to return e using fuse_reply_entry.
      */
-#if 0
+#if 1
     // Change the above line to "#if 1", and your code goes here
-    fuse_reply_entry(req, &e);
+    yfs_client::status ret;
+    if( (ret = fuseserver_createhelper( parent, name, mode, &e , extent_protocol::T_DIR)) == yfs_client::OK ) {
+        fuse_reply_entry(req, &e);
+        printf("OK: create dir returns.\n");
+    } else {
+        if (ret == yfs_client::EXIST) {
+            fuse_reply_err(req, EEXIST);
+        }else{
+            fuse_reply_err(req, ENOENT);
+        }
+    }
+  
 #else
     fuse_reply_err(req, ENOSYS);
 #endif
@@ -498,7 +509,12 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
      * success:	fuse_reply_err(req, 0);
      * not found: fuse_reply_err(req, ENOENT);
      */
-    fuse_reply_err(req, ENOSYS);
+
+    if(yfs->unlink(parent, name) == yfs_client::OK) {
+        fuse_reply_err(req, 0);
+    } else {
+        fuse_reply_err(req, ENOSYS);
+    }
 
 }
 

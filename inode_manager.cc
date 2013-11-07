@@ -1,4 +1,5 @@
 #include "inode_manager.h"
+#include <time.h>
 
 // Bitmap ------------------------------------
 Bitmap::Bitmap() {
@@ -187,6 +188,9 @@ inode_manager::alloc_inode(uint32_t type)
     bzero(ino, sizeof(struct inode));
     ino->size = 0;
     ino->type = type;
+    ino->ctime = time(NULL);
+    ino->mtime = 0;
+    ino->atime = 0;
     put_inode(i, ino);
     free(ino);
     return i;
@@ -214,6 +218,9 @@ inode_manager::free_inode(uint32_t inum)
   if(ino != NULL) {
     bzero(ino, sizeof(struct inode));
     ino->type = 0;
+    ino->ctime = 0;
+    ino->mtime = 0;
+    ino->atime = 0;
     put_inode(inum, ino);
     free(ino);
   }
@@ -333,6 +340,9 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
   }
 
   *(*buf_out + ino->size) = '\0'; 
+  ino->atime = time(NULL);
+  ino->ctime = time(NULL);
+  put_inode(inum, ino);
   free(ino);
   return;
 }
@@ -410,6 +420,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
   }
 */
   ino->size = size;
+  ino->mtime = time(NULL);
+  ino->ctime = time(NULL);
   put_inode(inum, ino);
 
   free(ino);

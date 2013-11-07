@@ -150,7 +150,7 @@ yfs_client::setattr(inum ino, size_t size)
 }
 
 int
-yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
+yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, extent_protocol::types type)
 {
     int r = OK;
 
@@ -177,7 +177,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
     if(isdir(parent)) {
         readdir(parent, list);
         dentry.name.assign(name);
-        ec->create(extent_protocol::T_FILE, dentry.inum);
+        ec->create(type, dentry.inum);
         ino_out = dentry.inum;
         list.push_back(dentry);
         printf("dentry name:%s  inum:%d\n", dentry.name.c_str(), dentry.inum);
@@ -416,6 +416,26 @@ int yfs_client::unlink(inum parent,const char *name)
      * and update the parent directory content.
      */
 
+    std::list<dirent> list;
+    if((r = readdir(parent, list)) != yfs_client::OK) {
+        return r;
+    }
+
+    std::list<dirent>::iterator iter;
+    for(iter = list.begin();iter != list.end();iter++) {
+        if(iter->name.compare(name) == 0)
+            break;
+    }
+
+    if(iter == list.end())
+        return ENOENT;
+
+    if(isdir(iter->inum)) {
+        return r;
+    }
+
+    list.erase(iter);
+    r = ec->put(parent, dentry_list_to_string(list));
     return r;
 }
 
