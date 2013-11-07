@@ -132,13 +132,22 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
          * create a struct stat, fill it in using getattr, 
          * and reply back using fuse_reply_attr.
          */
-#if 0
-        // Change the above line to "#if 1", and your code goes here
-        // Note: fill st using getattr before fuse_reply_attr
+
+        yfs_client::inum inum = ino;
+        yfs_client::status ret;
+
+        ret = yfs->setattr(inum, attr->st_size);
+        if (ret != yfs_client::OK) {
+            fuse_reply_err(req, ENOSYS);
+            assert(false);
+        }
+        ret = getattr(inum, st);
+        if (ret != yfs_client::OK) {
+            fuse_reply_err(req, ENOENT);
+            assert(false);
+        }
+
         fuse_reply_attr(req, &st, 0);
-#else
-    fuse_reply_err(req, ENOSYS);
-#endif
 
     } else {
         fuse_reply_err(req, ENOSYS);
@@ -166,14 +175,15 @@ fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
      * note: you should use yfs->read to read the buffer of size;
      * and reply using fuse_reply_buf. 
      */
-#if 0
+    yfs_client::inum inum = ino;
+    yfs_client::status ret;
     std::string buf;
-    // Change the above "#if 0" to "#if 1", and your code goes here
+    ret = yfs->read(inum, size, off, buf);
+    if (ret != yfs_client::OK) {
+        fuse_reply_err(req, ENOSYS);
+        assert(false);
+    }
     fuse_reply_buf(req, buf.data(), buf.size());
-#else
-    fuse_reply_err(req, ENOSYS);
-#endif
-
 
 }
 
@@ -203,12 +213,15 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
      * from off to ino;
      * and reply the length of bytes_written using fuse_reply_write.
      */
-#if 0
-    // Change the above line to "#if 1", and your code goes here
-    fuse_reply_write(req, size);
-#else
-    fuse_reply_err(req, ENOSYS);
-#endif
+    yfs_client::inum inum = ino;
+    yfs_client::status ret;
+    size_t bytes_written;
+    ret = yfs->write(inum, size, off, buf, bytes_written);
+    if (ret != yfs_client::OK) {
+        fuse_reply_err(req, ENOSYS);
+        assert(false);
+    }
+    fuse_reply_write(req, bytes_written);
 }
 
 //

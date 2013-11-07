@@ -90,7 +90,7 @@ block_manager::free_block(uint32_t id)
   read_block(BBLOCK(id), buf);
   uint32_t bi = id % BPB / 8; // byte index
   uint32_t bo = id % BPB % 8; // byte offset
-  buf[bi] &= (0xFF - (0x1 << bo));
+  buf[bi] &= (0xFF - (0x1 << (7 - bo)));
   write_block(BBLOCK(id), buf);
 }
 
@@ -198,6 +198,7 @@ inode_manager::free_inode(uint32_t inum)
     for (uint32_t i = 0; i * BLOCK_SIZE < ino->size; i++) {
       assert(ino->blocks[i]);
       bm->free_block(ino->blocks[i]);
+      ino->blocks[i] = 0;
     }
   }
 
@@ -205,6 +206,7 @@ inode_manager::free_inode(uint32_t inum)
     for (uint32_t i = 0; i < NDIRECT; i++) {
       assert(ino->blocks[i]);
       bm->free_block(ino->blocks[i]);
+      ino->blocks[i] = 0;
     }
     char indbuf[BLOCK_SIZE];
     bm->read_block(ino->blocks[NDIRECT], indbuf);
@@ -213,8 +215,10 @@ inode_manager::free_inode(uint32_t inum)
     for (; j * BLOCK_SIZE + NDIRECT * BLOCK_SIZE < ino->size; j++) {
       assert(indblks[j]);
       bm->free_block(indblks[j]);
+      indblks[j] = 0;
     }
     bm->free_block(ino->blocks[NDIRECT]);
+    ino->blocks[NDIRECT] = 0;
   }
 
   ino->type = 0;
@@ -358,7 +362,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
 
   size = MIN(size, MAXFILE * BLOCK_SIZE);
 
-  if (0 < size && size <= NDIRECT * BLOCK_SIZE) {
+  if (size <= NDIRECT * BLOCK_SIZE) {
     // copy blocks
     uint32_t i = 0;
     for (; i * BLOCK_SIZE < size; i++) {
@@ -375,15 +379,19 @@ inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
     for (; i < NDIRECT && ino->blocks[i]; i++) {
       assert(size < ino->size);
       bm->free_block(ino->blocks[i]);
+      ino->blocks[i] = 0;
     }
     if (ino->blocks[NDIRECT]) {
       assert(i == NDIRECT);
       char indbuf[BLOCK_SIZE];
       bm->read_block(ino->blocks[NDIRECT], indbuf);
       uint32_t *indblks = (uint32_t *) indbuf;
-      for (uint32_t j = 0; j < NINDIRECT && indblks[j]; j++)
+      for (uint32_t j = 0; j < NINDIRECT && indblks[j]; j++) {
         bm->free_block(indblks[j]);
+        indblks[j] = 0;
+      }
       bm->free_block(ino->blocks[NDIRECT]);
+      ino->blocks[NDIRECT] = 0;
     }
   }
 
@@ -421,6 +429,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int ssize)
     for (; j < NINDIRECT && indblks[j]; j++) {
       assert(size < ino->size);
       bm->free_block(indblks[j]);
+      indblks[j] = 0;
     }
   }
 

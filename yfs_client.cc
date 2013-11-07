@@ -125,6 +125,31 @@ yfs_client::setattr(inum ino, size_t size)
      * according to the size (<, =, or >) content length.
      */
 
+    extent_protocol::attr a;
+    std::string buf;
+
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (size == a.size)
+        goto release;
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (size < a.size) {
+        buf = buf.substr(0, size);
+        assert(buf.size() == size);
+        ec->put(ino, buf);
+    }
+    else {
+        buf.resize(size, '\0');
+        assert(buf.size() == size);
+        ec->put(ino, buf);
+    }
+
+release:
     return r;
 }
 
@@ -163,7 +188,6 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bo
     }
     sst << name << " " << ino_out << "\n";
     buf.append(sst.str());
-    // buf += name + " " + ino_out + "\n";
     if (ec->put(parent, buf) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -239,7 +263,31 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
      * your lab2 code goes here.
      * note: read using ec->get().
      */
+    std::string buf;
+    extent_protocol::attr a;
 
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+    if (off >= a.size) {
+        data = "";
+        assert(data.size() == 0);
+    }
+    if (off + size > a.size) {
+        data = buf.substr(off, a.size - off);
+        assert(data.size() == (size_t)a.size - off);
+    } else {
+        data = buf.substr(off, size);
+        assert(data.size() == size);
+    }
+
+release:
     return r;
 }
 
@@ -254,7 +302,44 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      * note: write using ec->put().
      * when off > length of original file, fill the holes with '\0'.
      */
+    std::string buf;
+    std::string head, tail;
+    extent_protocol::attr a;
 
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+    if (off > a.size) {
+        bytes_written = off - a.size + size;
+        size_t original_len = buf.size();
+        assert(original_len == a.size);
+        buf.resize(off, '\0');
+        size_t new_len = buf.size();
+        assert(new_len == (size_t)off);
+        ec->put(ino, buf.append(data, size));
+    } else {
+        bytes_written = a.size - off + size;
+        head = buf.substr(0, off);
+        head.append(data, size);
+        if (off + size < a.size) {
+            tail = buf.substr(off + size, a.size - (off + size));
+            head.append(tail);
+        }
+        if (a.size > off + size)
+            assert(head.size() == a.size);
+        else
+            assert(head.size() == off + size);
+
+        ec->put(ino, head);
+    }
+
+release:
     return r;
 }
 
