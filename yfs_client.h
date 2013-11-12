@@ -39,6 +39,9 @@ class yfs_client {
  private:
   static std::string filename(inum);
   static inum n2i(std::string);
+  int get_dentry(std::string dir_content, int begin, dirent &dentry);
+  std::string dentry_list_to_string(std::list<dirent> list);
+
 
  public:
   yfs_client(std::string, std::string);
@@ -49,9 +52,10 @@ class yfs_client {
   int getfile(inum, fileinfo &);
   int getdir(inum, dirinfo &);
 
+
   int setattr(inum, size_t);
   int lookup(inum, const char *, bool &, inum &);
-  int create(inum, const char *, mode_t, inum &);
+  int create(inum, const char *, mode_t, inum &, extent_protocol::types type);
   int readdir(inum, std::list<dirent> &);
   int write(inum, size_t, off_t, const char *, size_t &);
   int read(inum, size_t, off_t, std::string &);

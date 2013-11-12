@@ -1,0 +1,4 @@
+Note:
+// the disk layout is like this:
+ | boot sector(one block)| superblock(one block) | block bitmap | inode table| data|
+

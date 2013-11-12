@@ -1,0 +1,5 @@
+yfs_client::lookup is ok.
+ec->put & ec->write is ok.
+yfs_client::readdir is ok.
+so I think problem may happened at fuse.cc.
+It is better to read evernote again to see what has been foggoten.

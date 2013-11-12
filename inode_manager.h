@@ -12,6 +12,25 @@
 
 typedef uint32_t blockid_t;
 
+// Bitmap ------------------------------
+class Bitmap {
+  private:
+    char* map;
+    uint32_t numBits;
+    uint32_t numChar;
+
+  public:
+    Bitmap();
+    Bitmap(uint32_t nBits);
+    ~Bitmap();
+
+    void mark(uint32_t which);
+    void clear(uint32_t which);
+    bool test(uint32_t which);
+    uint32_t find();
+  //  uint32_t numClear();
+};
+
 // disk layer -----------------------------------------
 
 class disk {
@@ -35,6 +54,7 @@ typedef struct superblock {
 class block_manager {
  private:
   disk *d;
+  Bitmap* block_bitmap;
   std::map <uint32_t, int> using_blocks;
  public:
   block_manager();
@@ -66,6 +86,9 @@ class block_manager {
 #define NINDIRECT (BLOCK_SIZE / sizeof(uint))
 #define MAXFILE (NDIRECT + NINDIRECT)
 
+#define MIN(a,b) ((a)<(b) ? (a) : (b))
+#define BLOCK_COUNT(size) ((size + BLOCK_SIZE - 1)/BLOCK_SIZE)
+
 typedef struct inode {
   short type;
   unsigned int size;
@@ -78,6 +101,7 @@ typedef struct inode {
 class inode_manager {
  private:
   block_manager *bm;
+  Bitmap* inode_bitmap;
   struct inode* get_inode(uint32_t inum);
   void put_inode(uint32_t inum, struct inode *ino);
 

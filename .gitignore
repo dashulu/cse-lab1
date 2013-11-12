@@ -1,3 +1,12 @@
 *.o
 *.d
+*.out
 lab1_tester
+.tags
+a.out
+Bitmap.cc
+Bitmap.h
+Bitmaptest.cc
+lab1_5100379017.tgz
+test_result
+yfs_client1.log
