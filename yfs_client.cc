@@ -373,7 +373,7 @@ int yfs_client::unlink(inum parent,const char *name)
         if (ec->put(parent, new_buf) != extent_protocol::OK)
             return IOERR;
         else
-            return OK;
+            return r;
     } else
         return EXIST;
 }
