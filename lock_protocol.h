@@ -15,6 +15,12 @@ class lock_protocol {
     release,
     stat
   };
+  enum lock_ret {
+  	ok = 0,
+  	lock_not_found,
+  	lock_false_release,
+  	lock_is_free
+  };
 };
 
 #endif 
