@@ -6,13 +6,16 @@
 #include <string>
 #include "extent_protocol.h"
 #include "extent_server.h"
+#include "lock_client.h"
 
 class extent_client {
  private:
   rpcc *cl;
+ // lock_client *lc;
 
  public:
   extent_client(std::string dst);
+  ~extent_client();
 
   extent_protocol::status create(uint32_t type, extent_protocol::extentid_t &eid);
   extent_protocol::status get(extent_protocol::extentid_t eid, 

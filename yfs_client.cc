@@ -40,10 +40,13 @@ yfs_client::isfile(inum inum)
 {
     extent_protocol::attr a;
 
+    lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         printf("error getting attr\n");
+        lc->release(inum);
         return false;
     }
+    lc->release(inum);
 
     if (a.type == extent_protocol::T_FILE) {
         printf("isfile: %lld is a file\n", inum);
@@ -66,10 +69,13 @@ yfs_client::getfile(inum inum, fileinfo &fin)
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
+    lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
+        lc->release(inum);
         goto release;
     }
+    lc->release(inum);
 
     fin.atime = a.atime;
     fin.mtime = a.mtime;
@@ -88,10 +94,13 @@ yfs_client::getdir(inum inum, dirinfo &din)
 
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
+    lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
+        lc->release(inum);
         goto release;
     }
+    lc->release(inum);
     din.atime = a.atime;
     din.mtime = a.mtime;
     din.ctime = a.ctime;
@@ -123,11 +132,12 @@ yfs_client::setattr(inum ino, size_t size)
 
     printf("yfs_client setattr ino:%d size:%d\n", ino, size);
     std::string file;
+    lc->acquire(ino);
     if((r = ec->get(ino, file)) != yfs_client::OK) {
+        lc->release(ino);
         return r;
     }
 
-    printf("file.size in setattr:%d \n", file.size());
     if(file.size() > size) {
         file.resize(size);
         printf("file.size in setattr:%d \n", file.size());
@@ -138,10 +148,7 @@ yfs_client::setattr(inum ino, size_t size)
     }
 
     r = ec->put(ino, file);
-    struct stat st;
-    extent_protocol::attr a;
-    ec->getattr(ino, a);
-    printf("after yfs_client setattr ino:%d size:%d\n", ino, a.size);
+    lc->release(ino);
     return r;
 }
 
@@ -161,44 +168,36 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, ex
     std::list<dirent> list_readdir;
     yfs_client::inum ino;
     yfs_client::dirent dentry;
+
+    lc->acquire(parent + 1024);
+    
     if(( r = lookup(parent, name, found, ino_out)) != OK) {
         ino_out = 0;
+        lc->release(parent + 1024);
         return r;
     } 
     if(found) {
         ino_out = 0;
+        lc->release(parent + 1024);
         return r;
     }
 
     if(isdir(parent)) {
         readdir(parent, list);
+        lc->acquire(parent);
         dentry.name.assign(name);
         ec->create(type, dentry.inum);
         ino_out = dentry.inum;
         list.push_back(dentry);
-        printf("dentry name:%s  inum:%d\n", dentry.name.c_str(), dentry.inum);
         std::string content;
-        ec->get(parent, content);
-        printf("get content of data:%s\n", content.c_str());
         content = dentry_list_to_string(list);
-        printf("content of dentry:%s\n", content.c_str());
         ec->put(parent, dentry_list_to_string(list));
-        ec->get(parent, content);
-        printf("get content of data:%s\n", content.c_str());
-        bool found = false;
-        lookup(parent, dentry.name.c_str(), found, ino);
-        if(found) {
-            printf("found file %s in parent %d\n", dentry.name.c_str(), parent);
-        }
-        readdir(parent, list_readdir);
-        if(list_readdir.size() > 0) {
-            printf("list_readdir size:%d\n", list_readdir.size());
-        } else {
-            printf("readdir has some error.\n");
-        }
+        lc->release(parent);
     } else {
+        lc->release(parent + 1024);
         return r;
     }
+    lc->release(parent + 1024);
     return r;
 }
 
@@ -279,10 +278,9 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
     yfs_client::dirent dentry;
     int begin = 0;
 
-    printf("parent:%d\n", parent);
+    lc->acquire(parent);
     ec->get((extent_protocol::extentid_t)parent, dir_content);
-
-    printf("dir_content:%s\n", dir_content.c_str());
+    lc->release(parent);
     while((begin = get_dentry(dir_content, begin, dentry)) >= 0 ) {
         if(!dentry.name.compare(name)) {
             found = true;
@@ -312,9 +310,10 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
     std::string dir_content;
     yfs_client::dirent dentry;
     int begin = 0;
-    ec->get((extent_protocol::extentid_t)dir, dir_content);
 
-    printf("dir_content in readdir:%s\n", dir_content.c_str());
+    lc->acquire(dir);
+    ec->get((extent_protocol::extentid_t)dir, dir_content);
+    lc->release(dir);
 
     while((begin = get_dentry(dir_content, begin, dentry)) >= 0 ) {
         list.push_back(dentry);
@@ -335,14 +334,19 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
      */
 
     fileinfo fin;
-    getfile(ino, fin); 
-    if( (r = ec->get(ino, file)) != yfs_client::OK)
-        return r;
+    getfile(ino, fin);
 
-    printf("fin.size :%d\n", fin.size);
-    if(fin.size <= off )
+    lc->release(ino + 1024);
+    lc->acquire(ino); 
+    if( (r = ec->get(ino, file)) != yfs_client::OK)
+        lc->release(ino);
         return r;
-    else {
+    lc->release(ino);
+    lc->release(ino + 1024);
+
+    if(fin.size <= off ) {
+        return r;
+    } else {
       //  data.assign(file.substr(off, size));
         data.clear();
         size = size + off < fin.size ? size : fin.size - off;
@@ -367,15 +371,20 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      */
 
     std::string file;
+    lc->acquire(ino + 1024);
+    lc->acquire(ino);
     if((r = ec->get(ino, file)) != yfs_client::OK) {
+        lc->release(ino);
+        lc->release(ino + 1024);
         return r;
     }
     bytes_written = size;
  //   bytes_written = size <= strlen(data) ? size : strlen(data);
     fileinfo fin;
-    getfile(ino, fin); 
+    lc->release(ino);
+    getfile(ino, fin);
+    lc->acquire(ino); 
 
-    printf("fin.size:%d off:%d size:%d\n", fin.size, off,size);
     if(fin.size >= off + size) {
         for(int i = off;i < off + size;i++) {
             file[i] = data[i - off];
@@ -397,8 +406,12 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     }
     if((r = ec->put(ino, file)) != yfs_client::OK) {
         bytes_written = 0;
+        lc->release(ino);
+        lc->release(ino + 1024);
         return r;
     }
+    lc->release(ino);
+    lc->release(1024);
     return r;
 }
 
@@ -431,7 +444,9 @@ int yfs_client::unlink(inum parent,const char *name)
     }
 
     list.erase(iter);
+    lc->acquire(parent);
     r = ec->put(parent, dentry_list_to_string(list));
+    lc->release(parent);
     return r;
 }
 

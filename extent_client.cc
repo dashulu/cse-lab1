@@ -12,9 +12,15 @@ extent_client::extent_client(std::string dst)
   sockaddr_in dstsock;
   make_sockaddr(dst.c_str(), &dstsock);
   cl = new rpcc(dstsock);
+ // lc = new lock_client(3772);
   if (cl->bind() != 0) {
     printf("extent_client: bind failed\n");
   }
+}
+
+extent_client::~extent_client() {
+  delete cl;
+ // delete lc;
 }
 
 // a demo to show how to use RPC
@@ -32,6 +38,7 @@ extent_client::create(uint32_t type, extent_protocol::extentid_t &id)
 {
   extent_protocol::status ret = extent_protocol::OK;
   // Your lab3 code goes here
+
   ret = cl->call(extent_protocol::create, type, id);
   return ret;
 }

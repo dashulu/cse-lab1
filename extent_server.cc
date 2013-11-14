@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <assert.h>
 
 extent_server::extent_server() 
 {
@@ -48,6 +49,7 @@ int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
     buf = "";
   else {
     buf.assign(cbuf, size);
+    assert(size == buf.size());
     free(cbuf);
   }
 
