@@ -154,11 +154,20 @@ block_manager::write_block(uint32_t id, const char *buf)
 inode_manager::inode_manager()
 {
   bm = new block_manager();
-  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
-  if (root_dir != 1) {
+//  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
+  struct inode *ino = (struct inode *) malloc(sizeof(struct inode));
+  bzero(ino, sizeof(struct inode));
+  ino->size = 0;
+  ino->type = extent_protocol::T_DIR;
+  ino->ctime = time(NULL);
+  ino->mtime = 0;
+  ino->atime = 0;
+  put_inode(1, ino);
+  free(ino);
+/*  if (root_dir != 1) {
     printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
     exit(0);
-  }
+  }*/
 }
 
 /* Create a new file.
@@ -176,7 +185,15 @@ inode_manager::alloc_inode(uint32_t type)
   struct inode *tmp;
 
   // too slow. A better way is add a inode bitmap.
-  for(i = 1;i < INODE_NUM;i++) {
+/*  for(i = 1;i < INODE_NUM;i++) {
+    if( (tmp = get_inode(i)) == NULL) {
+      break;
+    } else {
+      free(tmp);
+    }
+  }*/
+  while(1) {
+    i = time(NULL) % 1024;
     if( (tmp = get_inode(i)) == NULL) {
       break;
     } else {
