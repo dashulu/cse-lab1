@@ -121,6 +121,7 @@ client1(void *xx)
 	for(int i = 0; i < 100; i++){
 		int arg = (random() % 2000);
 		std::string rep;
+	//	printf("i:%d\n",i);
 		int ret = clients[which_cl]->call(25, arg, rep);
 		VERIFY(ret == 0);
 		if ((int)rep.size()!=arg) {

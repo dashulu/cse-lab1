@@ -145,6 +145,7 @@ rpcc::call_m(unsigned int proc, marshall &req, R & r, TO to)
 {
 	unmarshall u;
 	int intret = call1(proc, req, u, to);
+//	printf("intrest %d\n", intret);
 	if (intret < 0) return intret;
 	u >> r;
 	if(u.okdone() != true) {
@@ -298,6 +299,7 @@ class rpcs : public chanmgr {
 	// per client that that client hasn't acknowledged receiving yet.
         // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
+	std::map<unsigned int, unsigned int> delete_reply;
 
 	void free_reply_window(void);
 	void add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz);

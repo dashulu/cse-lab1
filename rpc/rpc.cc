@@ -661,10 +661,74 @@ rpcs::rpcstate_t
 rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
                                 unsigned int xid_rep, char **b, int *sz)
 {
+
     ScopedLock rwl(&reply_window_m_);
+//    printf("check begin:");
+    rpcs::rpcstate_t ret = NEW;
+    unsigned int max_xid = 0;
+    bool flag = true; // judge whether it is a new request.
+
+    std::map<unsigned int, std::list<reply_t> >:: iterator iter;
+    if((iter = reply_window_.find(clt_nonce)) == reply_window_.end()) {
+   // 	add_reply(clt_nonce, xid, NULL, 0);
+    	std::list<reply_t> list;
+    	struct reply_t reply(xid);
+    	list.push_front(reply);
+    	std::pair<unsigned int, std::list<reply_t> > foo (clt_nonce, list);
+    	reply_window_.insert(foo);
+    	ret = NEW;
+    	flag = false;
+    }
+
+//printf("check bewtien\n");
+
+    for(std::list<reply_t>::iterator it = iter->second.begin();it != iter->second.end();it++) {
+  //  	printf("before if\n");
+    	if(it->xid == xid && flag) {
+  //  		printf("in if\n");
+    		if(it->cb_present) {
+    			ret = DONE;
+    			*b = (char*) malloc(it->sz);
+    			memcpy(*b, it->buf, it->sz);
+    			*sz = it->sz;
+    		} else {
+    			ret = INPROGRESS;
+    		}
+    	}
+//printf("check for whiel\n");
+    	while(it->xid <= xid_rep && it->xid != xid) {
+    		std::list<reply_t>::iterator tmp = it;
+    		it++;
+    		free(tmp->buf);
+    		iter->second.erase(tmp);
+    		if(it == iter->second.end())
+    			goto out; 
+    	}
+    }
+
+out:
+//printf("check out:\n");
+	std::map<unsigned int, unsigned int>::iterator it;
+	if((it = delete_reply.find(clt_nonce)) == delete_reply.end()) {
+		std::pair<unsigned int, unsigned int> foo (clt_nonce, xid_rep);
+		delete_reply.insert(foo);
+	} else {
+		if(xid_rep > it->second)
+			it->second = xid_rep;
+		if(ret == NEW && xid <= it->second && flag) {
+	    	ret = FORGOTTEN;
+	    } else if(ret == NEW && flag) {
+	    	struct reply_t reply(xid);
+			iter->second.push_front(reply);
+	    }
+	}
+//    printf("check end:");
+
+    printf("clt_nonce:%u,  xid:%u ret:%u xid_rep:%d\n", clt_nonce, xid, ret, xid_rep);
+    return ret;
 
     // Your lab3 code goes here
-    return NEW;
+    
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -676,7 +740,50 @@ void
 rpcs::add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz)
 {
     ScopedLock rwl(&reply_window_m_);
+    std::map<unsigned int, std::list<reply_t> >:: iterator iter;
+    if(b == NULL || sz < 0)
+    	return;
 
+    if((iter = reply_window_.find(clt_nonce)) == reply_window_.end()) {
+   // 	add_reply(clt_nonce, xid, NULL, 0);
+    	std::list<reply_t> list;
+    	struct reply_t reply(xid);
+    	reply.buf = (char*) malloc(sz);
+    	memcpy(reply.buf, b, sz);
+    	reply.sz = sz;
+    	reply.cb_present = true;
+    	list.push_front(reply);
+    	std::pair<unsigned int, std::list<reply_t> > foo (clt_nonce, list);
+    	reply_window_.insert(foo);
+    	return;
+    }
+
+
+    for(std::list<reply_t>::iterator it = iter->second.begin();it != iter->second.end();it++) {
+    	if(it->xid == xid) {
+    		if(it->cb_present) {
+    			free(it->buf);
+    			it->buf = (char*) malloc(sz);
+		    	memcpy(it->buf, b, sz);
+		    	it->sz = sz;
+    			return;
+    		} else {
+    			it->buf = (char*) malloc(sz);
+		    	memcpy(it->buf, b, sz);
+		    	it->sz = sz;
+		    	it->cb_present = true;
+		    	return;
+    		}
+    	}
+    }
+
+    struct reply_t reply(xid);
+	reply.buf = (char*) malloc(sz);
+	memcpy(reply.buf, b, sz);
+	reply.sz = sz;
+	reply.cb_present = true;
+	iter->second.push_front(reply);
+	return;
     // Your lab3 code goes here
 }
 
