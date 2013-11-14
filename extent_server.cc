@@ -68,7 +68,7 @@ int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr
   return extent_protocol::OK;
 }
 
-int extent_server::remove(extent_protocol::extentid_t id, int &)
+int extent_server::remove(extent_protocol::extentid_t id, int & r)
 {
   printf("extent_server: write %lld\n", id);
 
