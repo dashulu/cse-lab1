@@ -664,7 +664,40 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
     ScopedLock rwl(&reply_window_m_);
 
     // Your lab3 code goes here
-    return NEW;
+    printf("checkduplicate_and_update: (%u, %u, %u)\n", clt_nonce, xid, xid_rep);
+    std::map<unsigned int, std::list<reply_t> >::iterator clt;
+    std::list<reply_t>::iterator it;
+
+    clt = reply_window_.find(clt_nonce);
+    VERIFY(clt != reply_window_.end());
+
+    it = clt->second.begin();
+
+    while (it != clt->second.end()) {
+    	if (it->xid < xid_rep) {
+    		VERIFY(it->cb_present);
+    		free(it->buf);
+    		clt->second.erase(it++);
+    	} else {
+    		break;
+    	}
+    }
+
+    if (it != clt->second.end() && xid < it->xid) {
+    	return FORGOTTEN;
+    }
+
+	for (; it != clt->second.end() && it->xid < xid; it++)
+	{}
+
+	if (it != clt->second.end() && it->xid == xid) {
+		*b = it->buf;
+		*sz = it->sz;
+		return it->cb_present ? DONE : INPROGRESS;
+	} else {
+		clt->second.insert(it, reply_t(xid));
+	    return NEW;
+	}
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -678,6 +711,24 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz)
     ScopedLock rwl(&reply_window_m_);
 
     // Your lab3 code goes here
+    printf("reply to (%u, %u)\n", clt_nonce, xid);
+    std::map<unsigned int, std::list<reply_t> >::iterator clt;
+    std::list<reply_t>::iterator it;
+
+    clt = reply_window_.find(clt_nonce);
+    VERIFY(clt != reply_window_.end());
+
+    it = clt->second.begin();
+    for (; it != clt->second.end(); it++) {
+    	if (it->xid == xid) {
+    		VERIFY(it->cb_present == false);
+    		it->cb_present = true;
+    		it->buf = b;
+    		it->sz = sz;
+    		return;
+    	}
+    }
+    VERIFY(false);
 }
 
 void
