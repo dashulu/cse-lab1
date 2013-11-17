@@ -41,8 +41,9 @@ yfs_client::isfile(inum inum)
     extent_protocol::attr a;
 
     lc->acquire(inum);
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
-        printf("error getting attr\n");
+    int r;
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        printf("error getting attr return value:%d\n", r);
         lc->release(inum);
         return false;
     }
@@ -61,8 +62,9 @@ yfs_client::_isfile(inum inum)
 {
     extent_protocol::attr a;
 
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
-        printf("error getting attr\n");
+    int r;
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        printf("error getting attr return value:%d\n", r);
         return false;
     }
 
@@ -94,7 +96,9 @@ yfs_client::getfile(inum inum, fileinfo &fin)
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
     lc->acquire(inum);
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        
+        printf("get file error:%d\n", r);
         r = IOERR;
         lc->release(inum);
         goto release;
@@ -118,7 +122,9 @@ yfs_client::_getfile(inum inum, fileinfo &fin)
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        
+        printf("get file error:%d\n", r);
         r = IOERR;
         goto release;
     }
@@ -141,7 +147,8 @@ yfs_client::getdir(inum inum, dirinfo &din)
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
     lc->acquire(inum);
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        printf("get file error get dir:%d\n",r);
         r = IOERR;
         lc->release(inum);
         goto release;
@@ -162,7 +169,8 @@ yfs_client::_getdir(inum inum, dirinfo &din)
 
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
+    if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+        printf("get file error get dir:%d\n",r);
         r = IOERR;
         goto release;
     }
@@ -462,11 +470,8 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
     _getfile(ino, fin);
 
 
-    /*
-    if( (r = ec->get(ino, file)) != yfs_client::OK)
-        lc->release(ino);
-        return r;
-        */
+    
+    r = ec->get(ino, file);
 
     if(fin.size <= off ) {
         lc->release(ino);
