@@ -340,11 +340,14 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
     lc->acquire(ino); 
     if( (r = ec->get(ino, file)) != yfs_client::OK)
         lc->release(ino);
+        lc->release(ino + 1024);
+        printf("get file error: r:%d yfs_client::OK:%d file:%s\n", r, yfs_client::OK, file.c_str());//data read:%s file:%s", data.c_str(), file.c_str());
         return r;
     lc->release(ino);
     lc->release(ino + 1024);
 
     if(fin.size <= off ) {
+        printf("fin.size < off:\n");//data read:%s file:%s", data.c_str(), file.c_str());
         return r;
     } else {
       //  data.assign(file.substr(off, size));
@@ -355,6 +358,7 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
         }
     }
 
+    printf("data read:%s file:%s", data.c_str(), file.c_str());
     return r;
 }
 
@@ -412,6 +416,7 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     }
     lc->release(ino);
     lc->release(1024);
+    printf("data wirte:%s data:%s\n", file.c_str(), data);
     return r;
 }
 
