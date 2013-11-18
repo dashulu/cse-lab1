@@ -104,6 +104,7 @@ class inode_manager {
   Bitmap* inode_bitmap;
   struct inode* get_inode(uint32_t inum);
   void put_inode(uint32_t inum, struct inode *ino);
+  pthread_mutex_t mp;
 
  public:
   inode_manager();

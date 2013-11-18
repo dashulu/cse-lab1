@@ -156,6 +156,7 @@ inode_manager::inode_manager()
   bm = new block_manager();
 //  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
   struct inode *ino = (struct inode *) malloc(sizeof(struct inode));
+  pthread_mutex_init(&mp, NULL);
   bzero(ino, sizeof(struct inode));
   ino->size = 0;
   ino->type = extent_protocol::T_DIR;
@@ -183,6 +184,9 @@ inode_manager::alloc_inode(uint32_t type)
   int i;
   struct inode *ino;
   struct inode *tmp;
+  char buf[BLOCK_SIZE];
+
+
 
   // too slow. A better way is add a inode bitmap.
 /*  for(i = 1;i < INODE_NUM;i++) {
@@ -192,26 +196,47 @@ inode_manager::alloc_inode(uint32_t type)
       free(tmp);
     }
   }*/
-  while(1) {
-    i = time(NULL) % 1024;
+
+//  pthread_mutex_lock(&mp); 
+ /* for(i = 1;i < INODE_NUM;i++) {
     if( (tmp = get_inode(i)) == NULL) {
       break;
     } else {
       free(tmp);
     }
+  }*/
+
+  while(1) {
+    //i = time(NULL) % 1022 + 2;
+    i=1+(int)(1023.0*rand()/(RAND_MAX+1.0));
+    bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
+    ino = (struct inode*)buf + i%IPB;
+    if (ino->type == 0) {
+      break;
+    }
+    /*
+    if( (tmp = get_inode(i)) == NULL) {
+      printf("alloc inode num:%d\n",i);
+      break;
+    } else {
+      free(tmp);
+    }*/
   }
+  
   if(i < INODE_NUM) {
-    ino = (struct inode *) malloc(sizeof(struct inode));
-    bzero(ino, sizeof(struct inode));
+ //   ino = (struct inode *) malloc(sizeof(struct inode));
+ //   bzero(ino, sizeof(struct inode));
     ino->size = 0;
     ino->type = type;
     ino->ctime = time(NULL);
     ino->mtime = 0;
     ino->atime = 0;
     put_inode(i, ino);
-    free(ino);
+//    pthread_mutex_unlock(&mp);
+//    free(ino);
     return i;
   } else {
+//    pthread_mutex_unlock(&mp);
     return 0;
   }
 }
@@ -227,8 +252,7 @@ inode_manager::free_inode(uint32_t inum)
 
   struct inode *ino;
 
-  if(inum < 2)
-    return;
+
   
   ino = get_inode(inum);
 
@@ -238,7 +262,9 @@ inode_manager::free_inode(uint32_t inum)
     ino->ctime = 0;
     ino->mtime = 0;
     ino->atime = 0;
+//    pthread_mutex_lock(&mp);
     put_inode(inum, ino);
+//    pthread_mutex_unlock(&mp);
     free(ino);
   }
 

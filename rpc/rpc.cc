@@ -680,7 +680,6 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
     	flag = false;
     }
 
-//printf("check bewtien\n");
 
     for(std::list<reply_t>::iterator it = iter->second.begin();it != iter->second.end();it++) {
   //  	printf("before if\n");

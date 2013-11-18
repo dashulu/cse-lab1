@@ -297,14 +297,15 @@ unlinkn(const char *d, const char *prefix, int nf)
 {
   char n[512];
   int i;
+  int r;
 
   sleep(1);
 
   for(i = 0; i < nf; i++){
     sprintf(n, "%s/%s-%d", d, prefix, i);
-    if(unlink(n) != 0){
-      fprintf(stderr, "test-lab-3-a: unlink(%s): %s\n",
-              n, strerror(errno));
+    if((r = unlink(n)) != 0){
+      fprintf(stderr, "test-lab-3-a: unlink(%s): %s r:%d\n",
+              n, strerror(errno), r);
       exit(1);
     }
   }
