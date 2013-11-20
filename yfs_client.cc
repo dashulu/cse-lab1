@@ -40,6 +40,8 @@ yfs_client::isfile(inum inum)
 {
     extent_protocol::attr a;
 
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         printf("error getting attr\n");
         return false;
@@ -66,6 +68,9 @@ yfs_client::getfile(inum inum, fileinfo &fin)
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -88,6 +93,9 @@ yfs_client::getdir(inum inum, dirinfo &din)
 
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -123,6 +131,8 @@ yfs_client::setattr(inum ino, size_t size)
 
     extent_protocol::attr a;
     std::string buf;
+
+    YFSScopedLock sl(lc, ino);
 
     if (ec->getattr(ino, a) != extent_protocol::OK) {
         r = IOERR;
@@ -160,6 +170,9 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bo
      * after create file or dir, you must remember to modify the parent infomation.
      */
     bool found;
+
+    YFSScopedLock sl(lc, parent);
+
     if ((r = lookup(parent, name, found, ino_out)) != OK)
         return r;
     if (found)
@@ -234,6 +247,9 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
      * note: you should parse the dirctory content using your defined format,
      * and push the dirents to the list.
      */
+
+    YFSScopedLock sl(lc, dir);
+
     std::string buf;
     if (ec->get(dir, buf) != extent_protocol::OK) {
         r = IOERR;
@@ -261,6 +277,8 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
      */
     std::string buf;
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, ino);
 
     if (ec->getattr(ino, a) != extent_protocol::OK) {
         r = IOERR;
@@ -301,6 +319,8 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     std::string buf;
     std::string head, tail;
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, ino);
 
     if (ec->getattr(ino, a) != extent_protocol::OK) {
         r = IOERR;
@@ -351,6 +371,8 @@ int yfs_client::unlink(inum parent,const char *name)
 
     std::string buf, new_buf;
 
+    YFSScopedLock sl(lc, parent);
+    
     if (ec->get(parent, buf) != extent_protocol::OK)
         return IOERR;
 

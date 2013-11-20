@@ -58,4 +58,17 @@ class yfs_client {
   int unlink(inum,const char *);
 };
 
+struct YFSScopedLock {
+  private:
+    lock_client *lc_;
+    yfs_client::inum inum_;
+  public:
+    YFSScopedLock(lock_client *lc, yfs_client::inum inum): lc_(lc), inum_(inum) {
+      lc_->acquire(inum_);
+    }
+    ~YFSScopedLock() {
+      lc_->release(inum_);
+    }
+};
+
 #endif 
