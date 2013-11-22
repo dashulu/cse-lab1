@@ -221,7 +221,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
         fuse_reply_err(req, ENOSYS);
         assert(false);
     }
-    fuse_reply_write(req, bytes_written);
+    fuse_reply_write(req, size);
 }
 
 //
