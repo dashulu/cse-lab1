@@ -154,6 +154,7 @@ block_manager::write_block(uint32_t id, const char *buf)
 inode_manager::inode_manager()
 {
   bm = new block_manager();
+  used = 1;
 //  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
   struct inode *ino = (struct inode *) malloc(sizeof(struct inode));
   pthread_mutex_init(&mp, NULL);
@@ -208,7 +209,8 @@ inode_manager::alloc_inode(uint32_t type)
 
   while(1) {
     //i = time(NULL) % 1022 + 2;
-    i=1+(int)(1023.0*rand()/(RAND_MAX+1.0));
+    i=1+(int)(1022.0*rand()/(RAND_MAX+1.0));
+  //  i = (used++)/1022 + 1;
     bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
     ino = (struct inode*)buf + i%IPB;
     if (ino->type == 0) {

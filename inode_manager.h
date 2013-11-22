@@ -105,6 +105,7 @@ class inode_manager {
   struct inode* get_inode(uint32_t inum);
   void put_inode(uint32_t inum, struct inode *ino);
   pthread_mutex_t mp;
+  int used;
 
  public:
   inode_manager();

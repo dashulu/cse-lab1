@@ -96,7 +96,7 @@ int r = OK;
 printf("getfile %016llx\n", inum);
 extent_protocol::attr a;
 lc->acquire(inum);
-if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+if ((r=ec->getattr(inum, a)) != 0) {
 	
 	printf("get file error:%d\n", r);
 	r = IOERR;
@@ -122,7 +122,7 @@ int r = OK;
 
 printf("getfile %016llx\n", inum);
 extent_protocol::attr a;
-if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+if ((r=ec->getattr(inum, a)) != 0) {
 	
 	printf("get file error:%d\n", r);
 	r = IOERR;
@@ -147,7 +147,7 @@ int r = OK;
 printf("getdir %016llx\n", inum);
 extent_protocol::attr a;
 lc->acquire(inum);
-if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+if ((r=ec->getattr(inum, a)) != 0) {
 	printf("get file error get dir:%d\n",r);
 	r = IOERR;
 	lc->release(inum);
@@ -169,7 +169,7 @@ int r = OK;
 
 printf("getdir %016llx\n", inum);
 extent_protocol::attr a;
-if ((r=ec->getattr(inum, a)) != extent_protocol::OK) {
+if ((r=ec->getattr(inum, a)) != 0) {
 	printf("get file error get dir:%d\n",r);
 	r = IOERR;
 	goto release;
