@@ -173,7 +173,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bo
 
     YFSScopedLock sl(lc, parent);
 
-    if ((r = lookup(parent, name, found, ino_out)) != OK)
+    if ((r = _lookup(parent, name, found, ino_out)) != OK)
         return r;
     if (found)
         return EXIST;
@@ -207,6 +207,37 @@ release:
 }
 
 int
+yfs_client::_lookup(inum parent, const char *name, bool &found, inum &ino_out)
+{
+    int r = OK;
+
+    /*
+     * your lab2 code goes here.
+     * note: lookup file from parent dir according to name;
+     * you should design the format of directory content.
+     */
+    std::string buf;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
+
+    std::istringstream ist(buf);
+    std::string target(name), e_name;
+    inum e_ino;
+    found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ino_out = e_ino;
+            break;
+        }
+    }
+
+    return r;
+}
+
+int
 yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
 {
     int r = OK;
@@ -216,6 +247,7 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
      * note: lookup file from parent dir according to name;
      * you should design the format of directory content.
      */
+    YFSScopedLock sl(lc, parent);
     std::string buf;
     if (ec->get(parent, buf) != extent_protocol::OK) {
         r = IOERR;
