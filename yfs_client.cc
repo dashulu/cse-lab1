@@ -40,6 +40,8 @@ yfs_client::isfile(inum inum)
 {
     extent_protocol::attr a;
 
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         printf("error getting attr\n");
         return false;
@@ -66,6 +68,9 @@ yfs_client::getfile(inum inum, fileinfo &fin)
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -88,6 +93,9 @@ yfs_client::getdir(inum inum, dirinfo &din)
 
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
+
+    YFSScopedLock sl(lc, inum);
+
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -121,11 +129,38 @@ yfs_client::setattr(inum ino, size_t size)
      * according to the size (<, =, or >) content length.
      */
 
+    extent_protocol::attr a;
+    std::string buf;
+
+    YFSScopedLock sl(lc, ino);
+
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (size == a.size)
+        goto release;
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (size < a.size) {
+        buf = buf.substr(0, size);
+        assert(buf.size() == size);
+        ec->put(ino, buf);
+    }
+    else {
+        buf.resize(size, '\0');
+        assert(buf.size() == size);
+        ec->put(ino, buf);
+    }
+
+release:
     return r;
 }
 
 int
-yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
+yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bool _isdir)
 {
     int r = OK;
 
@@ -134,6 +169,70 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
      * note: lookup is what you need to check if file exist;
      * after create file or dir, you must remember to modify the parent infomation.
      */
+    bool found;
+
+    YFSScopedLock sl(lc, parent);
+
+    if ((r = _lookup(parent, name, found, ino_out)) != OK)
+        return r;
+    if (found)
+        return EXIST;
+
+    // create new inode entry
+    if (_isdir) {
+        ec->create(extent_protocol::T_DIR, ino_out);
+        assert(isdir(ino_out));
+    }
+    else {
+        ec->create(extent_protocol::T_FILE, ino_out);
+        assert(isfile(ino_out));
+    }
+
+    // add <name, inum> to parent
+    std::string buf;
+    std::stringstream sst;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    sst << name << " " << ino_out << "\n";
+    buf.append(sst.str());
+    if (ec->put(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+release:
+    return r;
+}
+
+int
+yfs_client::_lookup(inum parent, const char *name, bool &found, inum &ino_out)
+{
+    int r = OK;
+
+    /*
+     * your lab2 code goes here.
+     * note: lookup file from parent dir according to name;
+     * you should design the format of directory content.
+     */
+    std::string buf;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
+
+    std::istringstream ist(buf);
+    std::string target(name), e_name;
+    inum e_ino;
+    found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ino_out = e_ino;
+            break;
+        }
+    }
 
     return r;
 }
@@ -148,6 +247,24 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
      * note: lookup file from parent dir according to name;
      * you should design the format of directory content.
      */
+    YFSScopedLock sl(lc, parent);
+    std::string buf;
+    if (ec->get(parent, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
+
+    std::istringstream ist(buf);
+    std::string target(name), e_name;
+    inum e_ino;
+    found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ino_out = e_ino;
+            break;
+        }
+    }
 
     return r;
 }
@@ -163,6 +280,21 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
      * and push the dirents to the list.
      */
 
+    YFSScopedLock sl(lc, dir);
+
+    std::string buf;
+    if (ec->get(dir, buf) != extent_protocol::OK) {
+        r = IOERR;
+        return r;
+    }
+
+    std::istringstream ist(buf);
+    std::string e_name;
+    inum e_ino;
+    while (ist >> e_name && ist >> e_ino) {
+        struct dirent d = {e_name, e_ino};
+        list.push_back(d);
+    }
     return r;
 }
 
@@ -175,7 +307,33 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
      * your lab2 code goes here.
      * note: read using ec->get().
      */
+    std::string buf;
+    extent_protocol::attr a;
 
+    YFSScopedLock sl(lc, ino);
+
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+    if (off >= a.size) {
+        data = "";
+        assert(data.size() == 0);
+    }
+    if (off + size > a.size) {
+        data = buf.substr(off, a.size - off);
+        assert(data.size() == (size_t)a.size - off);
+    } else {
+        data = buf.substr(off, size);
+        assert(data.size() == size);
+    }
+
+release:
     return r;
 }
 
@@ -190,7 +348,46 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      * note: write using ec->put().
      * when off > length of original file, fill the holes with '\0'.
      */
+    std::string buf;
+    std::string head, tail;
+    extent_protocol::attr a;
 
+    YFSScopedLock sl(lc, ino);
+
+    if (ec->getattr(ino, a) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+    if (ec->get(ino, buf) != extent_protocol::OK) {
+        r = IOERR;
+        goto release;
+    }
+
+    if (off > a.size) {
+        bytes_written = off - a.size + size;
+        size_t original_len = buf.size();
+        assert(original_len == a.size);
+        buf.resize(off, '\0');
+        size_t new_len = buf.size();
+        assert(new_len == (size_t)off);
+        ec->put(ino, buf.append(data, size));
+    } else {
+        bytes_written = a.size - off + size;
+        head = buf.substr(0, off);
+        head.append(data, size);
+        if (off + size < a.size) {
+            tail = buf.substr(off + size, a.size - (off + size));
+            head.append(tail);
+        }
+        if (a.size > off + size)
+            assert(head.size() == a.size);
+        else
+            assert(head.size() == off + size);
+
+        ec->put(ino, head);
+    }
+
+release:
     return r;
 }
 
@@ -204,6 +401,33 @@ int yfs_client::unlink(inum parent,const char *name)
      * and update the parent directory content.
      */
 
-    return r;
-}
+    std::string buf, new_buf;
 
+    YFSScopedLock sl(lc, parent);
+    
+    if (ec->get(parent, buf) != extent_protocol::OK)
+        return IOERR;
+
+    std::istringstream ist(buf), new_ist;
+    std::string target(name), e_name;
+    inum e_ino;
+    bool found = false;
+    while (ist >> e_name && ist >> e_ino) {
+        if (e_name.compare(target) == 0) {
+            found = true;
+            ec->remove(e_ino);
+        } else {
+            std::stringstream sst;
+            sst << e_name << " " << e_ino << "\n";
+            new_buf.append(sst.str());
+        }
+    }
+
+    if (found) {
+        if (ec->put(parent, new_buf) != extent_protocol::OK)
+            return IOERR;
+        else
+            return r;
+    } else
+        return EXIST;
+}
