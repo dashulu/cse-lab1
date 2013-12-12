@@ -154,11 +154,20 @@ block_manager::write_block(uint32_t id, const char *buf)
 inode_manager::inode_manager()
 {
   bm = new block_manager();
-  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
-  if (root_dir != 1) {
+//  uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
+  struct inode *ino = (struct inode *) malloc(sizeof(struct inode));
+  bzero(ino, sizeof(struct inode));
+  ino->size = 0;
+  ino->type = extent_protocol::T_DIR;
+  ino->ctime = time(NULL);
+  ino->mtime = 0;
+  ino->atime = 0;
+  put_inode(1, ino);
+  free(ino);
+/*  if (root_dir != 1) {
     printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
     exit(0);
-  }
+  }*/
 }
 
 /* Create a new file.
@@ -174,27 +183,59 @@ inode_manager::alloc_inode(uint32_t type)
   int i;
   struct inode *ino;
   struct inode *tmp;
+  char buf[BLOCK_SIZE];
+
+
 
   // too slow. A better way is add a inode bitmap.
-  for(i = 1;i < INODE_NUM;i++) {
+/*  for(i = 1;i < INODE_NUM;i++) {
     if( (tmp = get_inode(i)) == NULL) {
       break;
     } else {
       free(tmp);
     }
+  }*/
+
+//  pthread_mutex_lock(&mp); 
+ /* for(i = 1;i < INODE_NUM;i++) {
+    if( (tmp = get_inode(i)) == NULL) {
+      break;
+    } else {
+      free(tmp);
+    }
+  }*/
+
+  while(1) {
+    //i = time(NULL) % 1022 + 2;
+    i=1+(int)(1023.0*rand()/(RAND_MAX+1.0));
+    bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
+    ino = (struct inode*)buf + i%IPB;
+    if (ino->type == 0) {
+      break;
+    }
+    /*
+    if( (tmp = get_inode(i)) == NULL) {
+      printf("alloc inode num:%d\n",i);
+      break;
+    } else {
+      free(tmp);
+    }*/
   }
+  
   if(i < INODE_NUM) {
-    ino = (struct inode *) malloc(sizeof(struct inode));
-    bzero(ino, sizeof(struct inode));
+ //   ino = (struct inode *) malloc(sizeof(struct inode));
+ //   bzero(ino, sizeof(struct inode));
     ino->size = 0;
     ino->type = type;
     ino->ctime = time(NULL);
     ino->mtime = 0;
     ino->atime = 0;
     put_inode(i, ino);
-    free(ino);
+//    pthread_mutex_unlock(&mp);
+//    free(ino);
     return i;
   } else {
+//    pthread_mutex_unlock(&mp);
     return 0;
   }
 }
@@ -210,8 +251,7 @@ inode_manager::free_inode(uint32_t inum)
 
   struct inode *ino;
 
-  if(inum < 2)
-    return;
+
   
   ino = get_inode(inum);
 
@@ -221,7 +261,9 @@ inode_manager::free_inode(uint32_t inum)
     ino->ctime = 0;
     ino->mtime = 0;
     ino->atime = 0;
+//    pthread_mutex_lock(&mp);
     put_inode(inum, ino);
+//    pthread_mutex_unlock(&mp);
     free(ino);
   }
 
@@ -237,7 +279,7 @@ inode_manager::get_inode(uint32_t inum)
   struct inode *ino, *ino_disk;
   char buf[BLOCK_SIZE];
 
-  printf("\tim: get_inode %d\n", inum);
+//  printf("\tim: get_inode %d\n", inum);
 
   if (inum < 0 || inum >= INODE_NUM) {
     printf("\tim: inum out of range\n");
@@ -249,7 +291,7 @@ inode_manager::get_inode(uint32_t inum)
 
   ino_disk = (struct inode*)buf + inum%IPB;
   if (ino_disk->type == 0) {
-    printf("\tim: inode not exist\n");
+//    printf("\tim: inode not exist\n");
     return NULL;
   }
 
@@ -467,7 +509,7 @@ inode_manager::remove_file(uint32_t inum)
   ino = get_inode(inum);
   if(ino == NULL) 
     return;
-
+  free_inode(inum);
   block_num = BLOCK_COUNT(ino->size);
 
   for(uint32_t i = 0;i < NDIRECT && i < block_num;i++) {
@@ -483,7 +525,7 @@ inode_manager::remove_file(uint32_t inum)
     bm->free_block(ino->blocks[NDIRECT]);
   }
   
-  free_inode(inum);
+  
   free(ino);
   return;
 }
