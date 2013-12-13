@@ -9,6 +9,7 @@
 //#include "yfs_protocol.h"
 #include "extent_client.h"
 #include <vector>
+#include <list>
 
 
 class yfs_client {
@@ -35,12 +36,14 @@ class yfs_client {
     std::string name;
     yfs_client::inum inum;
   };
+  
 
  private:
   static std::string filename(inum);
   static inum n2i(std::string);
   /* non lock version */
   int _lookup(inum, const char *, bool &, inum &);
+  
 
  public:
   yfs_client(std::string, std::string);

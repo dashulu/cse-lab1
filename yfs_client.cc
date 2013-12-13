@@ -193,6 +193,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bo
     std::string buf;
     std::stringstream sst;
     if (ec->get(parent, buf) != extent_protocol::OK) {
+        printf("error here 196.\n");
         r = IOERR;
         goto release;
     }
@@ -200,6 +201,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out, bo
     buf.append(sst.str());
     if (ec->put(parent, buf) != extent_protocol::OK) {
         r = IOERR;
+        printf("error here 204.\n");
         goto release;
     }
 

@@ -4,12 +4,31 @@
 #define extent_client_h
 
 #include <string>
+#include <list>
 #include "extent_protocol.h"
 #include "extent_server.h"
 
 class extent_client {
+ public:
+  struct cache {
+    std::string content;
+    extent_protocol::extentid_t i_num;
+    bool dirty;
+  };
+
+  struct Attr {
+    extent_protocol::extentid_t i_num;
+    short type;
+    unsigned int size;
+    unsigned int atime;
+    unsigned int mtime;
+    unsigned int ctime;
+  };
+
  private:
   rpcc *cl;
+  std::list<cache> caches;
+  std::list<Attr> attr_cache;
 
  public:
   extent_client(std::string dst);
