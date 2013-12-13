@@ -5,7 +5,7 @@
 
 #include "lock_protocol.h"
 #include "lock_client.h"
-
+#include "lock_client_cache.h"
 //#include "yfs_protocol.h"
 #include "extent_client.h"
 #include <vector>
@@ -39,6 +39,8 @@ class yfs_client {
  private:
   static std::string filename(inum);
   static inum n2i(std::string);
+  /* non lock version */
+  int _lookup(inum, const char *, bool &, inum &);
 
  public:
   yfs_client(std::string, std::string);
@@ -51,11 +53,24 @@ class yfs_client {
 
   int setattr(inum, size_t);
   int lookup(inum, const char *, bool &, inum &);
-  int create(inum, const char *, mode_t, inum &);
+  int create(inum, const char *, mode_t, inum &, bool isdir);
   int readdir(inum, std::list<dirent> &);
   int write(inum, size_t, off_t, const char *, size_t &);
   int read(inum, size_t, off_t, std::string &);
   int unlink(inum,const char *);
+};
+
+struct YFSScopedLock {
+  private:
+    lock_client *lc_;
+    yfs_client::inum inum_;
+  public:
+    YFSScopedLock(lock_client *lc, yfs_client::inum inum): lc_(lc), inum_(inum) {
+      lc_->acquire(inum_);
+    }
+    ~YFSScopedLock() {
+      lc_->release(inum_);
+    }
 };
 
 #endif 
