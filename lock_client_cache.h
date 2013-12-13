@@ -20,22 +20,35 @@ class lock_release_user {
   virtual ~lock_release_user() {};
 };
 
+class lock_record {
+public:
+  lock_protocol::client_state state;
+  int num;
+  pthread_cond_t cv;
+//  pthread_mutex_t mp;
+};
+
 class lock_client_cache : public lock_client {
  private:
   class lock_release_user *lu;
   int rlock_port;
   std::string hostname;
   std::string id;
+  std::map<lock_protocol::lockid_t, lock_record > states;
+  std::map<lock_protocol::lockid_t, bool> lock_needs_free;
+  pthread_mutex_t global_lock;
+  pthread_mutex_t lock_needs_free_lock;
  public:
   static int last_port;
   lock_client_cache(std::string xdst, class lock_release_user *l = 0);
   virtual ~lock_client_cache() {};
   lock_protocol::status acquire(lock_protocol::lockid_t);
   lock_protocol::status release(lock_protocol::lockid_t);
+  int stat(lock_protocol::lockid_t);
   rlock_protocol::status revoke_handler(lock_protocol::lockid_t, 
-                                        int &);
+                                         int&);
   rlock_protocol::status retry_handler(lock_protocol::lockid_t, 
-                                       int &);
+                                         int&);
 };
 
 
