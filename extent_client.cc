@@ -151,7 +151,36 @@ extent_client::remove(extent_protocol::extentid_t eid)
     }
   }
 
+//  flush(eid);
   ret = cl->call(extent_protocol::remove, eid, r);
+  return ret;
+}
+
+extent_protocol::status 
+extent_client::flush(extent_protocol::extentid_t eid) {
+  int r;
+
+  extent_protocol::status ret = extent_protocol::OK;
+
+
+  std::list<cache>::iterator iter;
+  for(iter = caches.begin();iter != caches.end();iter++) {
+    if(iter->i_num == eid) {
+      if(iter->dirty)
+        ret = cl->call(extent_protocol::put, eid, iter->content, r);
+      caches.erase(iter);
+      break;
+    }
+  }
+
+  std::list<Attr>::iterator iter1;
+  for(iter1 = attr_cache.begin();iter1 != attr_cache.end();iter1++) {
+    if(iter1->i_num == eid) {
+      attr_cache.erase(iter1);
+      break;
+    }
+  }
+  
   return ret;
 }
 
