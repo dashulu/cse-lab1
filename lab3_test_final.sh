@@ -1,7 +1,7 @@
 #!/bin/bash
 i=0
 export RPC_LOSSY=0
-while [ $i -lt 20 ]
+while [ $i -lt 10 ]
 do
   ./start.sh 0
   echo $i+"th test a:"
@@ -19,7 +19,7 @@ cat test_result | grep "tests completed OK" | wc -l >> test_result_stat
 
 export RPC_LOSSY=5
 i=0
-while [ $i -lt 20 ]
+while [ $i -lt 10 ]
 do
   ./start.sh 5
   echo $i+"th test a:"
